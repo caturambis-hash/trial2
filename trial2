@@ -610,19 +610,125 @@ local function tryActivateObject(obj)
     return ok and result == true
 end
 
-local function tryFindClickableButton(predicate)
-    if not PlayerGui then
-        return nil
+local getconnections_fn = getconnections
+local firesignal_fn = firesignal
+
+local function fireGuiButton(button)
+    if not button or not button:IsA("GuiButton") then
+        return false
     end
-    for _, obj in ipairs(PlayerGui:GetDescendants()) do
-        if obj:IsA("TextButton") or obj:IsA("ImageButton") then
-            local text = tostring(obj.Text or "")
-            local name = tostring(obj.Name or "")
-            local combined = (name .. " " .. text):lower()
-            if predicate(combined, obj) then
-                return obj
+    if not button.Visible or not button.Active then
+        return false
+    end
+
+    local fired = false
+    local function runConnection(conn)
+        if type(conn) ~= "table" then
+            return
+        end
+        if type(conn.Function) == "function" then
+            local ok = pcall(conn.Function)
+            if ok then
+                fired = true
             end
         end
+        if type(conn.Fire) == "function" then
+            local ok1 = pcall(function()
+                conn:Fire()
+            end)
+            if ok1 then
+                fired = true
+            end
+            local ok2 = pcall(conn.Fire, conn)
+            if ok2 then
+                fired = true
+            end
+        end
+    end
+
+    if typeof(getconnections_fn) == "function" then
+        local signals = {button.Activated, button.MouseButton1Click}
+        for i = 1, #signals do
+            local ok, connections = pcall(getconnections_fn, signals[i])
+            if ok and type(connections) == "table" then
+                for j = 1, #connections do
+                    runConnection(connections[j])
+                end
+            end
+        end
+    end
+
+    if not fired and typeof(firesignal_fn) == "function" then
+        pcall(firesignal_fn, button.Activated)
+        pcall(firesignal_fn, button.MouseButton1Click)
+        fired = true
+    end
+
+    if not fired then
+        local ok = pcall(function()
+            button:Activate()
+        end)
+        if ok then
+            fired = true
+        end
+    end
+
+    return fired
+end
+
+local autoBuyLastAttempt = 0
+local autoBuyCooldownUntil = 0
+local AUTO_BUY_DEBOUNCE = 0.35
+local AUTO_BUY_COOLDOWN = 0.6
+
+local function canAutoBuyNow()
+    local now = os.clock()
+    if now < autoBuyCooldownUntil then
+        return false
+    end
+    if autoBuyLastAttempt > 0 and now - autoBuyLastAttempt < AUTO_BUY_DEBOUNCE then
+        return false
+    end
+    autoBuyLastAttempt = now
+    return true
+end
+
+local function findBuyButtonForItem(itemName)
+    if not PlayerGui or itemName == "" then
+        return nil
+    end
+    local query = itemName:lower()
+    local bestButton = nil
+    local bestScore = -1
+    for _, obj in ipairs(PlayerGui:GetDescendants()) do
+        if obj:IsA("GuiButton") then
+            if obj.Visible and obj.Active then
+                local text = tostring(obj.Text or ""):lower()
+                local name = tostring(obj.Name or ""):lower()
+                local combined = (name .. " " .. text)
+                local score = 0
+                if combined:find("buy", 1, true) or combined:find("purchase", 1, true) or combined:find("shop", 1, true) or combined:find("get", 1, true) then
+                    score = score + 2
+                end
+                if text:find(query, 1, true) or name:find(query, 1, true) or combined:find(query, 1, true) then
+                    score = score + 4
+                end
+                if combined:find("tutorial", 1, true) or combined:find("skip", 1, true) or combined:find("continue", 1, true) or combined:find("next", 1, true) then
+                    score = score - 100
+                end
+                local parentText = tostring(obj.Parent and obj.Parent.Name or ""):lower()
+                if parentText:find("tutorial") then
+                    score = score - 100
+                end
+                if score > bestScore then
+                    bestScore = score
+                    bestButton = obj
+                end
+            end
+        end
+    end
+    if bestButton and bestScore >= 4 then
+        return bestButton
     end
     return nil
 end
@@ -635,37 +741,30 @@ local function autoBuySeedOrGear()
     if autoBuySeedsEnabled then
         for _, item in ipairs(SEED_DATABASE) do
             if autoBuySeedTargets[item] ~= false then
-                table.insert(candidates, item)
+                table.insert(candidates, {Name = item, Category = "Seeds"})
             end
         end
     end
     if autoBuyGearsEnabled then
         for _, item in ipairs(GEAR_DATABASE) do
             if autoBuyGearTargets[item] ~= false then
-                table.insert(candidates, item)
+                table.insert(candidates, {Name = item, Category = "Gear"})
             end
         end
     end
     if #candidates == 0 then
         return false
     end
-    for _, itemName in ipairs(candidates) do
-        local lowerName = itemName:lower()
-        local target = tryFindClickableButton(function(combined, obj)
-            if not combined:find("buy") and not combined:find("purchase") and not combined:find("shop") and not combined:find("get") then
-                return false
-            end
-            local parentText = tostring(obj.Parent and obj.Parent.Name or ""):lower()
-            if parentText:find("tutorial") then
-                return false
-            end
-            local labelText = tostring(obj.Text or ""):lower()
-            return labelText:find(lowerName, 1, true) or combined:find(lowerName, 1, true)
-        end)
-        if target then
-            local success = tryActivateObject(target)
+    if not canAutoBuyNow() then
+        return false
+    end
+    for _, candidate in ipairs(candidates) do
+        local button = findBuyButtonForItem(candidate.Name)
+        if button then
+            local success = fireGuiButton(button)
             if success then
-                return true, itemName
+                autoBuyCooldownUntil = os.clock() + AUTO_BUY_COOLDOWN
+                return true, candidate.Name
             end
         end
     end
@@ -676,14 +775,9 @@ local function autoClaimSeedDrop()
     if not autoClaimSeedDropEnabled then
         return false
     end
-    local target = tryFindClickableButton(function(combined)
-        if not combined:find("claim") and not combined:find("collect") then
-            return false
-        end
-        return combined:find("seed") or combined:find("drop") or combined:find("reward")
-    end)
+    local target = findBuyButtonForItem("seed")
     if target then
-        return tryActivateObject(target)
+        return fireGuiButton(target)
     end
     return false
 end
@@ -692,14 +786,9 @@ local function autoSkipTutorial()
     if not autoSkipTutorialEnabled then
         return false
     end
-    local target = tryFindClickableButton(function(combined)
-        if not combined:find("skip") and not combined:find("continue") and not combined:find("next") then
-            return false
-        end
-        return combined:find("tutorial") or combined:find("skip")
-    end)
+    local target = findBuyButtonForItem("tutorial")
     if target then
-        return tryActivateObject(target)
+        return fireGuiButton(target)
     end
     return false
 end
