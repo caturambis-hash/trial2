@@ -878,6 +878,8 @@ local function createMailGui()
     contentFrame.BackgroundTransparency = 1
     contentFrame.Parent = frame
 
+    local setActiveTab
+
     local function createTabButton(label, tabName)
         local btn = Instance.new("TextButton")
         btn.Name = tabName
@@ -891,6 +893,9 @@ local function createMailGui()
         btn.Parent = sidebar
         Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 6)
         btn.Activated:Connect(function()
+            setActiveTab(tabName)
+        end)
+        btn.MouseButton1Click:Connect(function()
             setActiveTab(tabName)
         end)
         return btn
@@ -938,7 +943,7 @@ local function createMailGui()
     tabButtons.ClaimDrop = createTabButton("Claim Drop Seed", "ClaimDrop")
     tabButtons.SkipTutorial = createTabButton("Skip Tutorial", "SkipTutorial")
 
-    local function setActiveTab(tabName)
+    function setActiveTab(tabName)
         for _, btn in pairs(tabButtons) do
             btn.BackgroundColor3 = Color3.fromRGB(50, 50, 56)
         end
@@ -950,6 +955,37 @@ local function createMailGui()
         buyGearPanel.Visible = tabName == "BuyGear"
         claimPanel.Visible = tabName == "ClaimDrop"
         tutorialPanel.Visible = tabName == "SkipTutorial"
+        if tabName == "GiftMail" then
+            giftPanel.ZIndex = 2
+            buySeedPanel.ZIndex = 1
+            buyGearPanel.ZIndex = 1
+            claimPanel.ZIndex = 1
+            tutorialPanel.ZIndex = 1
+        elseif tabName == "BuySeed" then
+            buySeedPanel.ZIndex = 2
+            giftPanel.ZIndex = 1
+            buyGearPanel.ZIndex = 1
+            claimPanel.ZIndex = 1
+            tutorialPanel.ZIndex = 1
+        elseif tabName == "BuyGear" then
+            buyGearPanel.ZIndex = 2
+            giftPanel.ZIndex = 1
+            buySeedPanel.ZIndex = 1
+            claimPanel.ZIndex = 1
+            tutorialPanel.ZIndex = 1
+        elseif tabName == "ClaimDrop" then
+            claimPanel.ZIndex = 2
+            giftPanel.ZIndex = 1
+            buySeedPanel.ZIndex = 1
+            buyGearPanel.ZIndex = 1
+            tutorialPanel.ZIndex = 1
+        elseif tabName == "SkipTutorial" then
+            tutorialPanel.ZIndex = 2
+            giftPanel.ZIndex = 1
+            buySeedPanel.ZIndex = 1
+            buyGearPanel.ZIndex = 1
+            claimPanel.ZIndex = 1
+        end
     end
     setActiveTab("GiftMail")
 
