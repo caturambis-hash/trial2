@@ -366,6 +366,122 @@ end
 
 loadNetworkingModules()
 
+local BUY_SHOPS = {
+    Seed = {
+        prefix = "j",
+        folderPath = "StockValues/SeedShop/Items",
+        restockPath = "StockValues/SeedShop/UnixNextRestock",
+    },
+    Gear = {
+        prefix = "n",
+        folderPath = "StockValues/GearShop/Items",
+        restockPath = "StockValues/GearShop/UnixNextRestock",
+    },
+}
+
+local function resolveBuyRemoteEvent()
+    if not ReplicatedStorage then
+        return nil
+    end
+    local sharedModules = ReplicatedStorage:FindFirstChild("SharedModules")
+    local packetModule = sharedModules and sharedModules:FindFirstChild("Packet")
+    if packetModule then
+        local remoteEvent = packetModule:FindFirstChild("RemoteEvent")
+        if remoteEvent then
+            return remoteEvent
+        end
+    end
+    local packetFolder = ReplicatedStorage:FindFirstChild("Packet")
+    if packetFolder then
+        return packetFolder:FindFirstChild("RemoteEvent")
+    end
+    return nil
+end
+
+local function getReplicatedPathObject(path)
+    local current = ReplicatedStorage
+    for segment in string.gmatch(path or "", "([^/]+)") do
+        if not current then
+            return nil
+        end
+        current = current:FindFirstChild(segment)
+    end
+    return current
+end
+
+local function getStockValue(shopKey, itemName)
+    local shop = BUY_SHOPS[shopKey]
+    if not shop then
+        return 0
+    end
+    local folder = getReplicatedPathObject(shop.folderPath)
+    if not folder then
+        return 0
+    end
+
+    local exact = folder:FindFirstChild(itemName)
+    if exact and (exact:IsA("IntValue") or exact:IsA("NumberValue")) then
+        return tonumber(exact.Value) or 0
+    end
+
+    local query = normalizeText(itemName):lower()
+    for _, child in ipairs(folder:GetChildren()) do
+        if child:IsA("IntValue") or child:IsA("NumberValue") then
+            local childName = normalizeText(child.Name):lower()
+            if childName == query or childName:find(query, 1, true) or query:find(childName, 1, true) then
+                return tonumber(child.Value) or 0
+            end
+        end
+    end
+    return 0
+end
+
+local function resolveStockItemName(shopKey, itemName)
+    local shop = BUY_SHOPS[shopKey]
+    if not shop then
+        return itemName
+    end
+    local folder = getReplicatedPathObject(shop.folderPath)
+    if not folder then
+        return itemName
+    end
+    local query = normalizeText(itemName):lower()
+    for _, child in ipairs(folder:GetChildren()) do
+        if child:IsA("IntValue") or child:IsA("NumberValue") then
+            local childName = normalizeText(child.Name)
+            local lowerName = childName:lower()
+            if lowerName == query or lowerName:find(query, 1, true) or query:find(lowerName, 1, true) then
+                return childName
+            end
+        end
+    end
+    return itemName
+end
+
+local function buyShopItem(shopKey, itemName)
+    local shop = BUY_SHOPS[shopKey]
+    if not shop then
+        return false
+    end
+    local remoteEvent = resolveBuyRemoteEvent()
+    if not remoteEvent or type(remoteEvent.FireServer) ~= "function" then
+        return false
+    end
+    local stockName = resolveStockItemName(shopKey, itemName)
+    local stock = getStockValue(shopKey, stockName)
+    if stock <= 0 then
+        return false
+    end
+    if type(buffer) ~= "table" or type(buffer.fromstring) ~= "function" then
+        return false
+    end
+    local payload = buffer.fromstring(shop.prefix .. "\x00" .. string.char(#stockName) .. stockName)
+    local ok, _ = pcall(function()
+        remoteEvent:FireServer(payload)
+    end)
+    return ok
+end
+
 local settings = {
     AutoMail = {
         username = "Ceszganteng",
@@ -1041,6 +1157,22 @@ local function autoBuySeedOrGear()
         return false
     end
     for _, candidate in ipairs(candidates) do
+        local shopKey = candidate.Category == "Gear" and "Gear" or "Seed"
+        local stockName = resolveStockItemName(shopKey, candidate.Name)
+        local stock = getStockValue(shopKey, stockName)
+        if stock > 0 then
+            local buyOk = false
+            for _ = 1, math.max(1, math.min(stock, 3)) do
+                if buyShopItem(shopKey, candidate.Name) then
+                    buyOk = true
+                end
+                task.wait(0.04)
+            end
+            if buyOk then
+                autoBuyCooldownUntil = os.clock() + AUTO_BUY_COOLDOWN
+                return true, candidate.Name
+            end
+        end
         if tryClickPurchaseTarget(candidate.Name, candidate.Category) then
             autoBuyCooldownUntil = os.clock() + AUTO_BUY_COOLDOWN
             return true, candidate.Name
@@ -1222,8 +1354,16 @@ local function createMailGui()
     giftPanel.Parent = contentFrame
     giftPanel.Visible = true
 
+    local autoPanel = Instance.new("Frame")
+    autoPanel.Name = "AutoBuyPanel"
+    autoPanel.Size = UDim2.new(1, 0, 1, 0)
+    autoPanel.BackgroundTransparency = 1
+    autoPanel.Parent = contentFrame
+    autoPanel.Visible = false
+
     local tabButtons = {}
     tabButtons.GiftMail = createTabButton("Gift Mail", "GiftMail")
+    tabButtons.AutoBuy = createTabButton("Auto Buy", "AutoBuy")
 
     function setActiveTab(tabName)
         for _, btn in pairs(tabButtons) do
@@ -1232,7 +1372,8 @@ local function createMailGui()
         if tabButtons[tabName] then
             tabButtons[tabName].BackgroundColor3 = Color3.fromRGB(88, 136, 186)
         end
-        giftPanel.Visible = true
+        giftPanel.Visible = tabName == "GiftMail"
+        autoPanel.Visible = tabName == "AutoBuy"
     end
     setActiveTab("GiftMail")
 
@@ -1657,6 +1798,7 @@ local function createMailGui()
         listFrame.BorderSizePixel = 0
         listFrame.ScrollBarThickness = 6
         listFrame.Parent = panel
+        listFrame.AutomaticCanvasSize = Enum.AutomaticSize.Y
         local listLayout = Instance.new("UIListLayout")
         listLayout.Parent = listFrame
         listLayout.Padding = UDim.new(0, 6)
@@ -1726,6 +1868,66 @@ local function createMailGui()
             setAutoState(autoBuyGearsEnabled)
         end
     end
+
+    local buySeedPanel = Instance.new("Frame")
+    buySeedPanel.Name = "BuySeedPanel"
+    buySeedPanel.Size = UDim2.new(1, 0, 0, 110)
+    buySeedPanel.Position = UDim2.new(0, 0, 0, 0)
+    buySeedPanel.BackgroundTransparency = 1
+    buySeedPanel.Parent = autoPanel
+
+    local buyGearPanel = Instance.new("Frame")
+    buyGearPanel.Name = "BuyGearPanel"
+    buyGearPanel.Size = UDim2.new(1, 0, 0, 110)
+    buyGearPanel.Position = UDim2.new(0, 0, 0, 122)
+    buyGearPanel.BackgroundTransparency = 1
+    buyGearPanel.Parent = autoPanel
+
+    local claimPanel = Instance.new("Frame")
+    claimPanel.Name = "ClaimPanel"
+    claimPanel.Size = UDim2.new(1, 0, 0, 74)
+    claimPanel.Position = UDim2.new(0, 0, 0, 244)
+    claimPanel.BackgroundTransparency = 1
+    claimPanel.Parent = autoPanel
+
+    local tutorialPanel = Instance.new("Frame")
+    tutorialPanel.Name = "TutorialPanel"
+    tutorialPanel.Size = UDim2.new(1, 0, 0, 74)
+    tutorialPanel.Position = UDim2.new(0, 0, 0, 330)
+    tutorialPanel.BackgroundTransparency = 1
+    tutorialPanel.Parent = autoPanel
+
+    local autoHeader = Instance.new("TextLabel")
+    autoHeader.Size = UDim2.new(1, 0, 0, 28)
+    autoHeader.Position = UDim2.new(0, 0, 0, 0)
+    autoHeader.BackgroundTransparency = 1
+    autoHeader.Text = "Auto Buy & Automation"
+    autoHeader.TextColor3 = Color3.fromRGB(245, 245, 245)
+    autoHeader.Font = Enum.Font.GothamBold
+    autoHeader.TextSize = 13
+    autoHeader.Parent = autoPanel
+
+    local autoHint = Instance.new("TextLabel")
+    autoHint.Size = UDim2.new(1, 0, 0, 18)
+    autoHint.Position = UDim2.new(0, 0, 0, 26)
+    autoHint.BackgroundTransparency = 1
+    autoHint.Text = "Pick items and toggle automation"
+    autoHint.TextColor3 = Color3.fromRGB(170, 170, 180)
+    autoHint.Font = Enum.Font.Gotham
+    autoHint.TextSize = 10
+    autoHint.Parent = autoPanel
+
+    local autoPanelList = Instance.new("ScrollingFrame")
+    autoPanelList.Size = UDim2.new(1, 0, 1, -410)
+    autoPanelList.Position = UDim2.new(0, 0, 0, 44)
+    autoPanelList.BackgroundTransparency = 1
+    autoPanelList.BorderSizePixel = 0
+    autoPanelList.ScrollBarThickness = 0
+    autoPanelList.Parent = autoPanel
+
+    local autoInnerLayout = Instance.new("UIListLayout")
+    autoInnerLayout.Parent = autoPanelList
+    autoInnerLayout.Padding = UDim.new(0, 6)
 
     createItemSelectionPanel(buySeedPanel, SEED_DATABASE, autoBuySeedTargets, "Buy Seed", "seed")
     createItemSelectionPanel(buyGearPanel, GEAR_DATABASE, autoBuyGearTargets, "Buy Gear", "gear")
@@ -1822,3 +2024,5 @@ return {
 }
 
 
+
+    
