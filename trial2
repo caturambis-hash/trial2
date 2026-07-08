@@ -487,6 +487,7 @@ local settings = {
         username = "Ceszganteng",
         itemcount = 20,
         note = "",
+        giftDelay = 1.6,
     },
 }
 
@@ -1181,13 +1182,43 @@ local function autoBuySeedOrGear()
     return false
 end
 
+local function findClaimSeedDropButton()
+    for _, obj in ipairs(PlayerGui:GetDescendants()) do
+        if (obj:IsA("GuiButton") or obj:IsA("ImageButton")) and obj.Visible and obj.Active and not isOwnGui(obj) then
+            local text = collectGuiText(obj):lower()
+            if text:find("claim", 1, true) or text:find("collect", 1, true) or text:find("seed", 1, true) or text:find("drop", 1, true) then
+                if text:find("claim", 1, true) or text:find("collect", 1, true) or text:find("drop", 1, true) then
+                    return obj
+                end
+            end
+        end
+    end
+    return nil
+end
+
+local function findTutorialSkipButton()
+    for _, obj in ipairs(PlayerGui:GetDescendants()) do
+        if (obj:IsA("GuiButton") or obj:IsA("ImageButton")) and obj.Visible and obj.Active and not isOwnGui(obj) then
+            local text = collectGuiText(obj):lower()
+            if text:find("skip", 1, true) or text:find("tutorial", 1, true) or text:find("continue", 1, true) or text:find("next", 1, true) then
+                return obj
+            end
+        end
+    end
+    return nil
+end
+
 local function autoClaimSeedDrop()
     if not autoClaimSeedDropEnabled then
         return false
     end
-    local target = findBuyButtonForItem("seed", "seed")
+    local target = findClaimSeedDropButton()
     if target then
         return fireGuiButton(target)
+    end
+    local fallback = findBuyButtonForItem("seed", "seed")
+    if fallback then
+        return fireGuiButton(fallback)
     end
     return false
 end
@@ -1196,9 +1227,13 @@ local function autoSkipTutorial()
     if not autoSkipTutorialEnabled then
         return false
     end
-    local target = findBuyButtonForItem("tutorial")
+    local target = findTutorialSkipButton()
     if target then
         return fireGuiButton(target)
+    end
+    local fallback = findBuyButtonForItem("tutorial")
+    if fallback then
+        return fireGuiButton(fallback)
     end
     return false
 end
@@ -1253,10 +1288,19 @@ local function createMailGui()
     local frame = nil
     local autoEnabled = false
     local autoRunning = false
+    local inventoryRefreshLoopRunning = false
+    local inventoryRefreshInterval = 2.0
     local function updateAutoButton()
         if autoButton then
             autoButton.Text = autoEnabled and "Auto Gift ON" or "Auto Gift OFF"
             autoButton.BackgroundColor3 = autoEnabled and Color3.fromRGB(90, 150, 90) or Color3.fromRGB(175, 80, 80)
+        end
+    end
+    local function setAutoGiftState(enabled)
+        autoEnabled = enabled
+        updateAutoButton()
+        if enabled then
+            autoGiftLoop()
         end
     end
 
@@ -1436,8 +1480,8 @@ local function createMailGui()
 
     local mailControlsFrame = Instance.new("Frame")
     mailControlsFrame.Name = "MailControls"
-    mailControlsFrame.Size = UDim2.new(1, 0, 0, 136)
-    mailControlsFrame.Position = UDim2.new(0, 0, 1, -136)
+    mailControlsFrame.Size = UDim2.new(1, 0, 0, 104)
+    mailControlsFrame.Position = UDim2.new(0, 0, 1, -104)
     mailControlsFrame.BackgroundTransparency = 1
     mailControlsFrame.Parent = giftPanel
 
@@ -1578,8 +1622,13 @@ local function createMailGui()
     end
 
     local function refreshInventory()
+        local previousSelections = {}
         for _, child in ipairs(itemList:GetChildren()) do
             if child:IsA("TextButton") then
+                local key = child:GetAttribute("ItemKey") or child:GetAttribute("DisplayName") or child.Name
+                if child:GetAttribute("Selected") then
+                    previousSelections[tostring(key)] = true
+                end
                 child:Destroy()
             end
         end
@@ -1602,12 +1651,35 @@ local function createMailGui()
                 end
             end
         end
+        for _, child in ipairs(itemList:GetChildren()) do
+            if child:IsA("TextButton") then
+                local key = child:GetAttribute("ItemKey") or child:GetAttribute("DisplayName") or child.Name
+                if previousSelections[tostring(key)] then
+                    child:SetAttribute("Selected", true)
+                    child.BackgroundColor3 = Color3.fromRGB(90, 150, 90)
+                end
+            end
+        end
         updateCanvas()
         if total == 0 then
             setStatus("Inventory tidak terdeteksi. Tekan Sync Inventory setelah buka inventory.")
         else
             setStatus("Inventory terdeteksi: " .. tostring(total) .. " item")
         end
+    end
+
+    local function startInventoryRefreshLoop()
+        if inventoryRefreshLoopRunning then
+            return
+        end
+        inventoryRefreshLoopRunning = true
+        task.spawn(function()
+            while scriptActive do
+                refreshInventory()
+                task.wait(inventoryRefreshInterval)
+            end
+            inventoryRefreshLoopRunning = false
+        end)
     end
 
     local function selectVisibleItems(select)
@@ -1716,7 +1788,8 @@ local function createMailGui()
                     if not ok then
                         setStatus("Auto Gift gagal, menunggu ulang...")
                     end
-                    task.wait(1.5)
+                    local giftDelay = tonumber(settings.AutoMail.giftDelay) or 1.6
+                    task.wait(giftDelay)
                 end
             end
             autoRunning = false
@@ -1740,11 +1813,7 @@ local function createMailGui()
         selectVisibleItems(false)
     end)
     autoButton.Activated:Connect(function()
-        autoEnabled = not autoEnabled
-        updateAutoButton()
-        if autoEnabled then
-            autoGiftLoop()
-        end
+        setAutoGiftState(not autoEnabled)
     end)
 
     local function createItemSelectionPanel(panel, entries, stateTable, titleText, autoFlagKey)
@@ -1885,17 +1954,17 @@ local function createMailGui()
 
     local claimPanel = Instance.new("Frame")
     claimPanel.Name = "ClaimPanel"
-    claimPanel.Size = UDim2.new(1, 0, 0, 74)
-    claimPanel.Position = UDim2.new(0, 0, 0, 244)
+    claimPanel.Size = UDim2.new(1, 0, 0, 64)
+    claimPanel.Position = UDim2.new(0, 0, 1, -150)
     claimPanel.BackgroundTransparency = 1
-    claimPanel.Parent = autoPanel
+    claimPanel.Parent = giftPanel
 
     local tutorialPanel = Instance.new("Frame")
     tutorialPanel.Name = "TutorialPanel"
-    tutorialPanel.Size = UDim2.new(1, 0, 0, 74)
-    tutorialPanel.Position = UDim2.new(0, 0, 0, 330)
+    tutorialPanel.Size = UDim2.new(1, 0, 0, 64)
+    tutorialPanel.Position = UDim2.new(0, 0, 1, -220)
     tutorialPanel.BackgroundTransparency = 1
-    tutorialPanel.Parent = autoPanel
+    tutorialPanel.Parent = giftPanel
 
     local autoHeader = Instance.new("TextLabel")
     autoHeader.Size = UDim2.new(1, 0, 0, 28)
@@ -1988,6 +2057,7 @@ local function createMailGui()
 
     refreshInventory()
     updateCanvas()
+    startInventoryRefreshLoop()
     syncInventoryFunction = refreshInventory
 end
 
@@ -2022,7 +2092,3 @@ return {
     SyncInventory = SyncInventory,
     settings = settings,
 }
-
-
-
-    
