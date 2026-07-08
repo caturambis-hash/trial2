@@ -693,6 +693,52 @@ local function canAutoBuyNow()
     return true
 end
 
+local function collectGuiText(obj)
+    if not obj then
+        return ""
+    end
+    local parts = {}
+    local function add(text)
+        if type(text) == "string" and text ~= "" then
+            table.insert(parts, text)
+        end
+    end
+    add(tostring(obj.Text or ""))
+    add(tostring(obj.Name or ""))
+    add(tostring(obj.PlaceholderText or ""))
+    if obj:IsA("GuiObject") then
+        for _, child in ipairs(obj:GetDescendants()) do
+            if child:IsA("TextLabel") or child:IsA("TextButton") or child:IsA("TextBox") then
+                add(tostring(child.Text or ""))
+            end
+        end
+    end
+    return table.concat(parts, " "):lower()
+end
+
+local function isPurchaseLikeText(text)
+    if type(text) ~= "string" then
+        return false
+    end
+    return text:find("buy", 1, true)
+        or text:find("purchase", 1, true)
+        or text:find("shop", 1, true)
+        or text:find("get", 1, true)
+        or text:find("claim", 1, true)
+        or text:find("collect", 1, true)
+end
+
+local function isBlockedText(text)
+    if type(text) ~= "string" then
+        return false
+    end
+    return text:find("tutorial", 1, true)
+        or text:find("skip", 1, true)
+        or text:find("continue", 1, true)
+        or text:find("next", 1, true)
+        or text:find("close", 1, true)
+end
+
 local function findBuyButtonForItem(itemName)
     if not PlayerGui or itemName == "" then
         return nil
@@ -700,34 +746,52 @@ local function findBuyButtonForItem(itemName)
     local query = itemName:lower()
     local bestButton = nil
     local bestScore = -1
+    local buttons = {}
     for _, obj in ipairs(PlayerGui:GetDescendants()) do
-        if obj:IsA("GuiButton") then
-            if obj.Visible and obj.Active then
-                local text = tostring(obj.Text or ""):lower()
-                local name = tostring(obj.Name or ""):lower()
-                local combined = (name .. " " .. text)
-                local score = 0
-                if combined:find("buy", 1, true) or combined:find("purchase", 1, true) or combined:find("shop", 1, true) or combined:find("get", 1, true) then
-                    score = score + 2
-                end
-                if text:find(query, 1, true) or name:find(query, 1, true) or combined:find(query, 1, true) then
-                    score = score + 4
-                end
-                if combined:find("tutorial", 1, true) or combined:find("skip", 1, true) or combined:find("continue", 1, true) or combined:find("next", 1, true) then
-                    score = score - 100
-                end
-                local parentText = tostring(obj.Parent and obj.Parent.Name or ""):lower()
-                if parentText:find("tutorial") then
-                    score = score - 100
-                end
-                if score > bestScore then
-                    bestScore = score
-                    bestButton = obj
-                end
-            end
+        if (obj:IsA("GuiButton") or obj:IsA("ImageButton")) and obj.Visible and obj.Active then
+            table.insert(buttons, obj)
         end
     end
-    if bestButton and bestScore >= 4 then
+
+    for _, button in ipairs(buttons) do
+        local text = collectGuiText(button)
+        local name = tostring(button.Name or ""):lower()
+        local parentText = collectGuiText(button.Parent)
+        local ancestorText = ""
+        local ancestor = button.Parent
+        for _ = 1, 4 do
+            if not ancestor then
+                break
+            end
+            ancestorText = ancestorText .. " " .. collectGuiText(ancestor)
+            ancestor = ancestor.Parent
+        end
+        local score = 0
+        if isPurchaseLikeText(text) then
+            score = score + 3
+        end
+        if isPurchaseLikeText(parentText) then
+            score = score + 2
+        end
+        if isPurchaseLikeText(ancestorText) then
+            score = score + 1
+        end
+        if text:find(query, 1, true) or name:find(query, 1, true) or parentText:find(query, 1, true) or ancestorText:find(query, 1, true) then
+            score = score + 6
+        end
+        if text:find("buy", 1, true) and (parentText:find(query, 1, true) or ancestorText:find(query, 1, true)) then
+            score = score + 4
+        end
+        if isBlockedText(text) or isBlockedText(parentText) or isBlockedText(ancestorText) then
+            score = score - 100
+        end
+        if score > bestScore then
+            bestScore = score
+            bestButton = button
+        end
+    end
+
+    if bestButton and bestScore >= 6 then
         return bestButton
     end
     return nil
