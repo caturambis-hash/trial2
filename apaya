@@ -1,120 +1,134 @@
 -- ============================================================
--- Grow A Garden 2 - Auto Gift Mail (Simple & Robust)
+-- Grow A Garden 2 - Auto Gift Mail (Dengan Sidebar Tab)
+-- Database item dari: github.com/slayer13412-arch/gag2-shop
 -- ============================================================
 
--- Cek environment
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local RunService = game:GetService("RunService")
 local TweenService = game:GetService("TweenService")
 local UserInputService = game:GetService("UserInputService")
 
 local LocalPlayer = Players.LocalPlayer
-if not LocalPlayer then
-    warn("LocalPlayer not found")
-    return
-end
-
+if not LocalPlayer then return end
 local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
 local PlayerName = LocalPlayer.Name
 
 -- ============================================================
--- FUNGSI UTILITY DASAR
+-- 1. DATABASE ITEM DARI REPOSITORY
 -- ============================================================
-local function notify(text, sub)
-    -- notifikasi sederhana menggunakan print dulu
-    print("[GAG2] " .. text .. " - " .. (sub or ""))
-    
-    -- Buat notifikasi GUI sederhana
-    local gui = Instance.new("ScreenGui")
-    gui.Name = "Notify"
-    gui.IgnoreGuiInset = true
-    gui.Parent = PlayerGui
-    
-    local frame = Instance.new("Frame")
-    frame.BackgroundColor3 = Color3.fromRGB(25,22,30)
-    frame.BorderSizePixel = 0
-    frame.Position = UDim2.new(0.5,-170,0.1,0)
-    frame.Size = UDim2.new(0,340,0,60)
-    frame.Parent = gui
-    
-    local title = Instance.new("TextLabel")
-    title.BackgroundTransparency = 1
-    title.Font = Enum.Font.GothamBold
-    title.Text = text
-    title.TextColor3 = Color3.fromRGB(230,200,240)
-    title.TextSize = 16
-    title.Position = UDim2.new(0,10,0,5)
-    title.Size = UDim2.new(1,-20,0,25)
-    title.Parent = frame
-    
-    local subLabel = Instance.new("TextLabel")
-    subLabel.BackgroundTransparency = 1
-    subLabel.Font = Enum.Font.Gotham
-    subLabel.Text = sub or ""
-    subLabel.TextColor3 = Color3.fromRGB(180,160,170)
-    subLabel.TextSize = 13
-    subLabel.Position = UDim2.new(0,10,0,30)
-    subLabel.Size = UDim2.new(1,-20,0,25)
-    subLabel.Parent = frame
-    
-    game:GetService("Debris"):AddItem(gui, 3)
+-- Seeds dari: assets/seeds/*.svg
+local SEED_LIST = {
+    "acorn", "apple", "bamboo", "banana", "blueberry", "briar-rose", "cactus",
+    "carrot", "cherry", "coconut", "corn", "dragon-fruit", "dragons-breath",
+    "grape", "green-bean", "hypno-bloom", "mango", "moon-bloom", "mushroom",
+    "pineapple", "poison-apple", "pomegranate", "pumpkin", "strawberry",
+    "sunflower", "tomato", "tulip", "venom-spitter", "venus-fly-trap", "watermelon", "rainbow-seed", "gold-seed", "mega-seed"
+}
+
+-- Pets dari: assets/pets/*.webp
+local PET_LIST = {
+    "bald-eagle", "bear", "bee", "big-bee", "black-dragon", "bunny", "butterfly",
+    "capybara", "cat", "chicken", "cow", "deer", "dog", "dolphin", "dragon",
+    "duck", "eagle", "elephant", "fish", "flamingo", "fox", "frog", "giraffe",
+    "goat", "goose", "hamster", "hedgehog", "horse", "kangaroo", "koala",
+    "lion", "llama", "monkey", "moose", "mouse", "octopus", "owl", "panda",
+    "parrot", "peacock", "penguin", "pig", "pigeon", "polar-bear", "pony",
+    "rabbit", "raccoon", "rat", "rhino", "rooster", "seahorse", "sheep",
+    "shrimp", "skunk", "sloth", "snail", "snake", "spider", "squirrel",
+    "swan", "tiger", "toad", "tortoise", "turkey", "turtle", "unicorn",
+    "walrus", "whale", "wolf", "zebra"
+}
+
+-- Gear (fallback jika tidak ada di repository)
+local GEAR_LIST = {
+    "Common-Watering Can","Common-Sprinkler","Uncommon-Sprinkler","Rare-Sprinkler",
+    "Legendary-Sprinkler","Super-Watering-Can","Super-Sprinkler",
+    "Jump-Mushroom","Speed-Mushroom","Shrink-Mushroom","Supersize-Mushroom",
+    "Invisibility Mushroom","Trowel","Sign","Lantern","Megaphone",
+    "Gnome","Flashbang","Basic Pot","Teleporter","Wheelbarrow",
+    "Strawberry-Sniper","Player-Magnet"
+}
+
+-- Crops (fallback)
+local CROP_LIST = {
+    "Apple","Banana","Orange","Grape","Watermelon","Strawberry","Tomato","Corn"
+}
+
+-- Fungsi untuk format nama agar lebih cantik
+local function formatItemName(raw)
+    -- ubah "briar-rose" -> "Briar Rose"
+    local name = raw:gsub("-", " "):gsub("^%l", string.upper)
+    -- kapitalisasi setiap kata
+    name = name:gsub("(%s)(%l)", function(space, letter) return space .. string.upper(letter) end)
+    return name
+end
+
+-- Buat database dengan format yang sudah diformat
+local ITEM_DB = {
+    Seeds = {},
+    Pets = {},
+    Gear = {},
+    Crops = {},
+}
+
+for _, raw in ipairs(SEED_LIST) do
+    table.insert(ITEM_DB.Seeds, formatItemName(raw))
+end
+for _, raw in ipairs(PET_LIST) do
+    table.insert(ITEM_DB.Pets, formatItemName(raw))
+end
+for _, name in ipairs(GEAR_LIST) do
+    table.insert(ITEM_DB.Gear, name)
+end
+for _, name in ipairs(CROP_LIST) do
+    table.insert(ITEM_DB.Crops, name)
 end
 
 -- ============================================================
--- AMBIL REMOTE EVENT
+-- 2. REMOTE EVENT & NETWORKING (Mail Exploiter)
 -- ============================================================
+local RemoteEvent = nil
 local function getRemote()
-    local remote = ReplicatedStorage:FindFirstChild("RemoteEvent")
-    if not remote then
-        local packet = ReplicatedStorage:FindFirstChild("Packet")
-        if packet then
-            remote = packet:FindFirstChild("RemoteEvent")
+    if not RemoteEvent then
+        local possible = {
+            ReplicatedStorage:FindFirstChild("RemoteEvent"),
+            ReplicatedStorage:FindFirstChild("SharedModules") and ReplicatedStorage.SharedModules:FindFirstChild("Packet") and ReplicatedStorage.SharedModules.Packet:FindFirstChild("RemoteEvent"),
+            ReplicatedStorage:FindFirstChild("Packet") and ReplicatedStorage.Packet:FindFirstChild("RemoteEvent"),
+        }
+        for _, p in ipairs(possible) do
+            if p then RemoteEvent = p; break end
         end
     end
-    return remote
+    return RemoteEvent
 end
 
--- ============================================================
--- FUNGSI LOOKUP & SEND MAIL
--- ============================================================
 local function lookupRecipient(username)
+    username = tostring(username or ""):lower():gsub("^%s*(.-)%s*$", "%1")
     if username == "" then return nil end
     local remote = getRemote()
     if remote then
-        local ok, result = pcall(function()
-            return remote:InvokeServer("LookupPlayer", username)
-        end)
-        if ok and type(result) == "number" and result > 0 then
-            return result
-        end
+        local ok, res = pcall(function() return remote:InvokeServer("LookupPlayer", username) end)
+        if ok and type(res) == "number" and res > 0 then return res end
     end
-    -- Fallback ke GetUserIdFromNameAsync
     local ok, id = pcall(Players.GetUserIdFromNameAsync, Players, username)
-    if ok and type(id) == "number" and id > 0 then
-        return id
-    end
+    if ok and type(id) == "number" and id > 0 then return id end
     return nil
 end
 
 local function sendMailBatch(userId, payload, note)
     local remote = getRemote()
-    if not remote then
-        return false, "Remote not found"
-    end
-    local ok, result = pcall(function()
-        return remote:InvokeServer("SendBatch", userId, payload, note or "")
+    if not remote then return false, "Remote not found" end
+    local ok, res, msg = pcall(function()
+        return remote:InvokeServer("SendBatch", userId, payload, tostring(note or ""))
     end)
-    if not ok then
-        return false, tostring(result)
-    end
-    if result == true then
-        return true, "Sent"
-    end
-    return false, tostring(result)
+    if not ok then return false, tostring(res) end
+    if res == true then return true, tostring(msg or "Sent") end
+    return false, tostring(msg or "Failed")
 end
 
 -- ============================================================
--- AMBIL INVENTORY DARI REPLICA
+-- 3. FUNGSI INVENTORY (dari PlayerStateClient)
 -- ============================================================
 local function getInventoryReplica()
     local shared = ReplicatedStorage:FindFirstChild("SharedModules")
@@ -132,27 +146,7 @@ end
 
 local function collectInventoryEntries()
     local inventory = getInventoryReplica()
-    if not inventory then
-        -- Fallback: coba dari PlayerGui/Backpack sederhana
-        local entries = {}
-        local function scan(obj)
-            if not obj then return end
-            for _, child in ipairs(obj:GetDescendants()) do
-                if child:IsA("TextLabel") or child:IsA("TextButton") then
-                    local txt = child.Text or ""
-                    if txt ~= "" then
-                        local name = txt:match("^([^%d]+)") or txt
-                        local qty = tonumber(txt:match("(%d+)$")) or 1
-                        table.insert(entries, { DisplayName = name, ItemKey = name, Category = "Unknown", Quantity = qty })
-                    end
-                end
-            end
-        end
-        scan(LocalPlayer:FindFirstChild("Backpack"))
-        scan(LocalPlayer:FindFirstChild("Inventory"))
-        return entries
-    end
-    
+    if not inventory then return {} end
     local entries = {}
     for cat, data in pairs(inventory) do
         if cat == "Pets" then
@@ -172,248 +166,271 @@ local function collectInventoryEntries()
     return entries
 end
 
+local function buildPayload(selectedItems)
+    local payload = {}
+    for _, item in ipairs(selectedItems) do
+        table.insert(payload, { Category = item.Category, ItemKey = item.ItemKey, Count = 1 })
+    end
+    return payload
+end
+
 -- ============================================================
--- UI BUILD
+-- 4. NOTIFIKASI
 -- ============================================================
-local function buildUI()
-    -- Hapus GUI lama
-    local old = PlayerGui:FindFirstChild("GiftHub")
-    if old then old:Destroy() end
-    
-    local screen = Instance.new("ScreenGui")
-    screen.Name = "GiftHub"
-    screen.IgnoreGuiInset = true
-    screen.Parent = PlayerGui
-    
-    -- Main frame
-    local mainFrame = Instance.new("Frame")
-    mainFrame.Size = UDim2.new(0,450,0,500)
-    mainFrame.Position = UDim2.new(0.5,-225,0.1,0)
-    mainFrame.BackgroundColor3 = Color3.fromRGB(20,18,28)
-    mainFrame.BorderSizePixel = 0
-    mainFrame.Active = true
-    mainFrame.Draggable = true
-    mainFrame.Parent = screen
-    
-    -- Title bar
-    local titleBar = Instance.new("Frame")
-    titleBar.BackgroundColor3 = Color3.fromRGB(40,30,48)
-    titleBar.BorderSizePixel = 0
-    titleBar.Size = UDim2.new(1,0,0,34)
-    titleBar.Parent = mainFrame
-    
-    local titleLabel = Instance.new("TextLabel")
-    titleLabel.BackgroundTransparency = 1
-    titleLabel.Font = Enum.Font.GothamBold
-    titleLabel.Text = "📨 Auto Gift Mail"
-    titleLabel.TextColor3 = Color3.fromRGB(230,200,240)
-    titleLabel.TextSize = 16
-    titleLabel.TextXAlignment = Enum.TextXAlignment.Center
-    titleLabel.Position = UDim2.new(0,0,0,0)
-    titleLabel.Size = UDim2.new(1,0,1,0)
-    titleLabel.Parent = titleBar
-    
-    -- Content
-    local content = Instance.new("ScrollingFrame")
-    content.BackgroundColor3 = Color3.fromRGB(38,38,38)
-    content.BorderSizePixel = 0
-    content.Size = UDim2.new(1,0,1,-34)
-    content.Position = UDim2.new(0,0,0,34)
-    content.ScrollBarThickness = 4
-    content.Parent = mainFrame
-    
-    local layout = Instance.new("UIListLayout")
-    layout.Padding = UDim.new(0,6)
-    layout.SortOrder = Enum.SortOrder.LayoutOrder
-    layout.Parent = content
-    
-    -- Helper untuk membuat UI elemen di dalam content
-    local function addInput(placeholder, default, width)
-        local box = Instance.new("TextBox")
-        box.Size = UDim2.new(width or 0.5,0,0,26)
-        box.BackgroundColor3 = Color3.fromRGB(52,52,58)
-        box.TextColor3 = Color3.fromRGB(240,240,240)
-        box.Text = default or ""
-        box.PlaceholderText = placeholder
-        box.ClearTextOnFocus = false
-        box.Font = Enum.Font.Gotham
-        box.TextSize = 12
-        box.Parent = content
-        return box
-    end
-    
-    local function addButton(text, color, callback)
-        local btn = Instance.new("TextButton")
-        btn.BackgroundColor3 = color or Color3.fromRGB(50,40,60)
-        btn.BorderSizePixel = 0
-        btn.Font = Enum.Font.GothamBold
-        btn.Text = text
-        btn.TextColor3 = Color3.fromRGB(240,220,245)
-        btn.TextSize = 13
-        btn.AutoButtonColor = false
-        btn.Size = UDim2.new(1,0,0,30)
-        btn.Parent = content
-        if callback then
-            btn.MouseButton1Click:Connect(callback)
+local function notify(text, sub, dur)
+    dur = dur or 2.5
+    local gui = Instance.new("ScreenGui")
+    gui.Name = "Notify"
+    gui.IgnoreGuiInset = true
+    gui.Parent = PlayerGui
+
+    local f = Instance.new("Frame")
+    f.BackgroundColor3 = Color3.fromRGB(25,22,30)
+    f.BorderSizePixel = 0
+    f.Position = UDim2.new(1,400,0,20)
+    f.Size = UDim2.new(0,340,0,60)
+    f.Parent = gui
+
+    local t = Instance.new("TextLabel")
+    t.BackgroundTransparency = 1
+    t.Font = Enum.Font.GothamBold
+    t.Text = text
+    t.TextColor3 = Color3.fromRGB(230,200,240)
+    t.TextSize = 15
+    t.TextXAlignment = Enum.TextXAlignment.Left
+    t.Position = UDim2.new(0,10,0,6)
+    t.Size = UDim2.new(1,-20,0,22)
+    t.Parent = f
+
+    local s = Instance.new("TextLabel")
+    s.BackgroundTransparency = 1
+    s.Font = Enum.Font.Gotham
+    s.Text = sub or ""
+    s.TextColor3 = Color3.fromRGB(180,160,170)
+    s.TextSize = 12
+    s.TextXAlignment = Enum.TextXAlignment.Left
+    s.Position = UDim2.new(0,10,0,28)
+    s.Size = UDim2.new(1,-20,0,22)
+    s.Parent = f
+
+    TweenService:Create(f, TweenInfo.new(0.15, Enum.EasingStyle.Quad), {
+        Position = UDim2.new(1,-380,0,20)
+    }):Play()
+
+    delay(dur, function()
+        if f and f.Parent then
+            TweenService:Create(f, TweenInfo.new(0.15), {
+                Position = UDim2.new(1,400,0,20)
+            }):Play()
+            delay(0.25, function() if gui and gui.Parent then gui:Destroy() end end)
         end
-        return btn
+    end)
+end
+
+-- ============================================================
+-- 5. UI HELPERS
+-- ============================================================
+local function createInput(parent, placeholder, default, width)
+    local box = Instance.new("TextBox")
+    box.Size = UDim2.new(width or 0.5,0,0,26)
+    box.BackgroundColor3 = Color3.fromRGB(52,52,58)
+    box.TextColor3 = Color3.fromRGB(240,240,240)
+    box.Text = default or ""
+    box.PlaceholderText = placeholder or ""
+    box.ClearTextOnFocus = false
+    box.Font = Enum.Font.Gotham
+    box.TextSize = 12
+    box.Parent = parent
+    return box
+end
+
+local function createButton(parent, text, color, callback)
+    local btn = Instance.new("TextButton")
+    btn.BackgroundColor3 = color or Color3.fromRGB(50,40,60)
+    btn.BorderSizePixel = 0
+    btn.Font = Enum.Font.GothamBold
+    btn.Text = text
+    btn.TextColor3 = Color3.fromRGB(240,220,245)
+    btn.TextSize = 12
+    btn.AutoButtonColor = false
+    btn.Size = UDim2.new(1,0,0,28)
+    btn.Parent = parent
+    btn.MouseEnter:Connect(function()
+        TweenService:Create(btn, TweenInfo.new(0.08), {
+            BackgroundColor3 = btn.BackgroundColor3:Lerp(Color3.new(0.15,0.05,0.2),0.1)
+        }):Play()
+    end)
+    btn.MouseLeave:Connect(function()
+        TweenService:Create(btn, TweenInfo.new(0.08), {
+            BackgroundColor3 = btn.BackgroundColor3:Lerp(Color3.new(0.2,0.15,0.25),0.1)
+        }):Play()
+    end)
+    if callback then btn.MouseButton1Click:Connect(callback) end
+    return btn
+end
+
+local function createToggle(parent, label, default, callback)
+    local frame = Instance.new("Frame")
+    frame.BackgroundColor3 = Color3.fromRGB(35,30,38)
+    frame.BorderSizePixel = 0
+    frame.Size = UDim2.new(1,0,0,34)
+    frame.Parent = parent
+
+    local btn = Instance.new("ImageButton")
+    btn.BackgroundColor3 = Color3.fromRGB(40,35,45)
+    btn.BackgroundTransparency = 0
+    btn.BorderSizePixel = 0
+    btn.Position = UDim2.new(0,0,0,0)
+    btn.Size = UDim2.new(1,0,1,0)
+    btn.AutoButtonColor = false
+    btn.Parent = frame
+
+    local lbl = Instance.new("TextLabel")
+    lbl.BackgroundTransparency = 1
+    lbl.Font = Enum.Font.Gotham
+    lbl.Text = label
+    lbl.TextColor3 = Color3.fromRGB(220,200,210)
+    lbl.TextSize = 12
+    lbl.TextXAlignment = Enum.TextXAlignment.Left
+    lbl.Position = UDim2.new(0,10,0,0)
+    lbl.Size = UDim2.new(0.65,-10,1,0)
+    lbl.Parent = frame
+
+    local toggleFrame = Instance.new("Frame")
+    toggleFrame.BackgroundColor3 = Color3.fromRGB(50,45,55)
+    toggleFrame.BorderSizePixel = 0
+    toggleFrame.Position = UDim2.new(1,-50-10,0.5,-10)
+    toggleFrame.Size = UDim2.new(0,36,0,18)
+    toggleFrame.Parent = frame
+
+    local inner = Instance.new("Frame")
+    inner.BackgroundColor3 = Color3.fromRGB(80,70,90)
+    inner.BorderSizePixel = 0
+    inner.Position = UDim2.new(0,2,0,2)
+    inner.Size = UDim2.new(0,14,0,14)
+    inner.Parent = toggleFrame
+
+    local status = Instance.new("TextLabel")
+    status.BackgroundTransparency = 1
+    status.Font = Enum.Font.Gotham
+    status.Text = "OFF"
+    status.TextColor3 = Color3.fromRGB(160,140,150)
+    status.TextSize = 10
+    status.TextXAlignment = Enum.TextXAlignment.Right
+    status.Position = UDim2.new(1,-58-10,0.5,-10)
+    status.Size = UDim2.new(0,35,0,20)
+    status.Parent = frame
+
+    local state = default or false
+    local function update(s)
+        state = s
+        TweenService:Create(inner, TweenInfo.new(0.12), {
+            Position = s and UDim2.new(1,-16,0,2) or UDim2.new(0,2,0,2),
+            BackgroundColor3 = s and Color3.fromRGB(100,200,100) or Color3.fromRGB(80,70,90)
+        }):Play()
+        TweenService:Create(toggleFrame, TweenInfo.new(0.12), {
+            BackgroundColor3 = s and Color3.fromRGB(60,150,60) or Color3.fromRGB(50,45,55)
+        }):Play()
+        status.Text = s and "ON" or "OFF"
+        status.TextColor3 = s and Color3.fromRGB(120,220,120) or Color3.fromRGB(160,140,150)
+        if callback then callback(s) end
     end
-    
-    local function addToggle(label, default, callback)
-        local frame = Instance.new("Frame")
-        frame.BackgroundColor3 = Color3.fromRGB(35,30,38)
-        frame.BorderSizePixel = 0
-        frame.Size = UDim2.new(1,0,0,36)
-        frame.Parent = content
-        
-        local lbl = Instance.new("TextLabel")
-        lbl.BackgroundTransparency = 1
-        lbl.Font = Enum.Font.Gotham
-        lbl.Text = label
-        lbl.TextColor3 = Color3.fromRGB(220,200,210)
-        lbl.TextSize = 12
-        lbl.TextXAlignment = Enum.TextXAlignment.Left
-        lbl.Position = UDim2.new(0,10,0,0)
-        lbl.Size = UDim2.new(0.65,-10,1,0)
-        lbl.Parent = frame
-        
-        local toggleFrame = Instance.new("Frame")
-        toggleFrame.BackgroundColor3 = Color3.fromRGB(50,45,55)
-        toggleFrame.BorderSizePixel = 0
-        toggleFrame.Position = UDim2.new(1,-50-10,0.5,-10)
-        toggleFrame.Size = UDim2.new(0,36,0,20)
-        toggleFrame.Parent = frame
-        
-        local inner = Instance.new("Frame")
-        inner.BackgroundColor3 = Color3.fromRGB(80,70,90)
-        inner.BorderSizePixel = 0
-        inner.Position = UDim2.new(0,2,0,2)
-        inner.Size = UDim2.new(0,16,0,16)
-        inner.Parent = toggleFrame
-        
-        local status = Instance.new("TextLabel")
-        status.BackgroundTransparency = 1
-        status.Font = Enum.Font.Gotham
-        status.Text = "OFF"
-        status.TextColor3 = Color3.fromRGB(160,140,150)
-        status.TextSize = 10
-        status.TextXAlignment = Enum.TextXAlignment.Right
-        status.Position = UDim2.new(1,-58-10,0.5,-10)
-        status.Size = UDim2.new(0,35,0,20)
-        status.Parent = frame
-        
-        local state = default or false
-        local function update(s)
-            state = s
-            inner.Position = s and UDim2.new(1,-18,0,2) or UDim2.new(0,2,0,2)
-            inner.BackgroundColor3 = s and Color3.fromRGB(100,200,100) or Color3.fromRGB(80,70,90)
-            toggleFrame.BackgroundColor3 = s and Color3.fromRGB(60,150,60) or Color3.fromRGB(50,45,55)
-            status.Text = s and "ON" or "OFF"
-            status.TextColor3 = s and Color3.fromRGB(120,220,120) or Color3.fromRGB(160,140,150)
-            if callback then callback(s) end
-        end
-        
-        -- Klik pada area toggle
-        local clickArea = Instance.new("ImageButton")
-        clickArea.BackgroundTransparency = 1
-        clickArea.Size = UDim2.new(1,0,1,0)
-        clickArea.Parent = frame
-        clickArea.MouseButton1Click:Connect(function()
-            update(not state)
-        end)
-        
-        update(state)
-        return { update = update, getState = function() return state end }
-    end
-    
-    -- ============================================================
-    -- BANGUN UI GIFT
-    -- ============================================================
-    local userBox = addInput("Username", "Ceszganteng", 0.5)
-    local qtyBox = addInput("Qty", "20", 0.4)
-    
+    btn.MouseButton1Click:Connect(function() update(not state) end)
+    update(state)
+    return { update = update, getState = function() return state end }
+end
+
+-- ============================================================
+-- 6. GIFT PANEL (Lengkap dengan Tab Kategori & Search)
+-- ============================================================
+local function buildGiftPanel(panel)
+    local giftState = {
+        allItems = {},
+        currentCategory = "Seeds",
+        searchQuery = "",
+        autoGiftEnabled = false,
+        itemButtons = {},
+    }
+
+    -- Username & Qty
+    local userBox = createInput(panel, "Username", "Ceszganteng", 0.5)
+    local qtyBox = createInput(panel, "Qty", "20", 0.4)
+    qtyBox.Position = UDim2.new(0.55,0,0,0)
+
     -- Tombol baris
     local btnRow = Instance.new("Frame")
     btnRow.BackgroundTransparency = 1
     btnRow.Size = UDim2.new(1,0,0,30)
-    btnRow.Parent = content
-    
-    local syncBtn = addButton("🔄 Sync", Color3.fromRGB(50,50,70), function()
-        refreshItems()
+    btnRow.Parent = panel
+
+    local syncBtn = createButton(btnRow, "🔄 Sync", Color3.fromRGB(50,50,70), function()
+        refreshInventory()
+        notify("🔄 Synced", "Inventory updated", 1)
     end)
     syncBtn.Size = UDim2.new(0.23,0,0,24)
-    syncBtn.Parent = btnRow
-    
-    local selectBtn = addButton("☑ All", Color3.fromRGB(60,60,70), function()
-        for _, item in ipairs(allItems) do
-            if item.Category == currentCategory then
+
+    local selectBtn = createButton(btnRow, "☑ All", Color3.fromRGB(60,60,70), function()
+        for _, item in ipairs(giftState.allItems) do
+            if item.Category == giftState.currentCategory then
                 item.selected = true
             end
         end
         updateItemList()
     end)
     selectBtn.Size = UDim2.new(0.23,0,0,24)
-    selectBtn.Parent = btnRow
-    
-    local clearBtn = addButton("☐ Clear", Color3.fromRGB(60,60,70), function()
-        for _, item in ipairs(allItems) do
-            if item.Category == currentCategory then
+
+    local clearBtn = createButton(btnRow, "☐ Clear", Color3.fromRGB(60,60,70), function()
+        for _, item in ipairs(giftState.allItems) do
+            if item.Category == giftState.currentCategory then
                 item.selected = false
             end
         end
         updateItemList()
     end)
     clearBtn.Size = UDim2.new(0.23,0,0,24)
-    clearBtn.Parent = btnRow
-    
-    local sendBtn = addButton("📤 Send", Color3.fromRGB(75,125,180), function()
+
+    local sendBtn = createButton(btnRow, "📤 Send", Color3.fromRGB(75,125,180), function()
         local recipient = userBox.Text
-        if recipient == "" then notify("Error", "Username kosong") return end
+        if recipient == "" then notify("⚠ Error", "Username kosong", 2) return end
         local selected = {}
-        for _, item in ipairs(allItems) do
+        for _, item in ipairs(giftState.allItems) do
             if item.selected then
                 table.insert(selected, { Category = item.Category, ItemKey = item.ItemKey })
             end
         end
-        if #selected == 0 then notify("Error", "Tidak ada item dipilih") return end
+        if #selected == 0 then notify("⚠ Error", "Tidak ada item dipilih", 2) return end
         local userId = lookupRecipient(recipient)
-        if not userId then notify("Error", "User tidak ditemukan") return end
-        local payload = {}
-        for _, it in ipairs(selected) do
-            table.insert(payload, { Category = it.Category, ItemKey = it.ItemKey, Count = 1 })
-        end
+        if not userId then notify("⚠ Error", "User tidak ditemukan", 2) return end
+        local payload = buildPayload(selected)
         local ok, msg = sendMailBatch(userId, payload, "")
         if ok then
-            notify("✅ Sent", #selected .. " items to " .. recipient)
+            notify("✅ Sent", #selected .. " items to " .. recipient, 2.5)
         else
-            notify("❌ Failed", msg)
+            notify("❌ Failed", msg, 2.5)
         end
     end)
     sendBtn.Size = UDim2.new(0.23,0,0,24)
-    sendBtn.Parent = btnRow
-    
-    -- Category Tabs
+
+    -- Category tabs
     local catFrame = Instance.new("Frame")
     catFrame.BackgroundTransparency = 1
-    catFrame.Size = UDim2.new(1,0,0,30)
-    catFrame.Parent = content
-    
+    catFrame.Size = UDim2.new(1,0,0,28)
+    catFrame.Parent = panel
+
     local categories = {"Seeds", "Gear", "Crops", "Pets"}
     local catBtns = {}
-    local currentCategory = "Seeds"
-    
     for i, cat in ipairs(categories) do
         local btn = Instance.new("TextButton")
-        btn.Size = UDim2.new(0.23,0,0,24)
+        btn.Size = UDim2.new(0.23,0,0,22)
         btn.Position = UDim2.new((i-1)*0.25,0,0,0)
         btn.BackgroundColor3 = (i==1) and Color3.fromRGB(88,136,186) or Color3.fromRGB(50,50,56)
         btn.TextColor3 = Color3.fromRGB(240,240,240)
         btn.Text = cat
         btn.Font = Enum.Font.GothamSemibold
-        btn.TextSize = 11
+        btn.TextSize = 10
         btn.Parent = catFrame
         btn.MouseButton1Click:Connect(function()
-            currentCategory = cat
+            giftState.currentCategory = cat
             for _, b in ipairs(catBtns) do
                 b.BackgroundColor3 = (b == btn) and Color3.fromRGB(88,136,186) or Color3.fromRGB(50,50,56)
             end
@@ -421,46 +438,46 @@ local function buildUI()
         end)
         table.insert(catBtns, btn)
     end
-    
-    -- Search Bar
+
+    -- Search bar
     local searchBox = Instance.new("TextBox")
-    searchBox.Size = UDim2.new(1,0,0,26)
+    searchBox.Size = UDim2.new(1,0,0,24)
     searchBox.BackgroundColor3 = Color3.fromRGB(52,52,58)
     searchBox.TextColor3 = Color3.fromRGB(240,240,240)
     searchBox.PlaceholderText = "🔍 Search items..."
     searchBox.ClearTextOnFocus = false
     searchBox.Font = Enum.Font.Gotham
-    searchBox.TextSize = 12
-    searchBox.Parent = content
-    local searchQuery = ""
+    searchBox.TextSize = 11
+    searchBox.Parent = panel
     searchBox:GetPropertyChangedSignal("Text"):Connect(function()
-        searchQuery = searchBox.Text:lower()
+        giftState.searchQuery = tostring(searchBox.Text):lower()
         updateItemList()
     end)
-    
-    -- Item List
+
+    -- Item list
     local itemFrame = Instance.new("ScrollingFrame")
     itemFrame.BackgroundColor3 = Color3.fromRGB(38,38,38)
     itemFrame.BorderSizePixel = 0
-    itemFrame.Size = UDim2.new(1,0,0,200)
+    itemFrame.Size = UDim2.new(1,0,0,180)
     itemFrame.ScrollBarThickness = 4
-    itemFrame.Parent = content
-    
+    itemFrame.Parent = panel
+
     local itemLayout = Instance.new("UIListLayout")
     itemLayout.Padding = UDim.new(0,2)
     itemLayout.SortOrder = Enum.SortOrder.LayoutOrder
     itemLayout.Parent = itemFrame
-    
-    -- Auto Gift Toggle
-    local autoGiftToggle = addToggle("🔁 Auto Gift", false, function(s)
+
+    -- Auto Gift toggle
+    local autoToggle = createToggle(panel, "🔁 Auto Gift", false, function(s)
+        giftState.autoGiftEnabled = s
         if s then
-            notify("Auto Gift", "Started")
+            notify("🔄 Auto Gift", "Started", 1.5)
             task.spawn(function()
-                while autoGiftToggle.getState() do
+                while giftState.autoGiftEnabled do
                     local recipient = userBox.Text
                     if recipient == "" then break end
                     local selected = {}
-                    for _, item in ipairs(allItems) do
+                    for _, item in ipairs(giftState.allItems) do
                         if item.selected then
                             table.insert(selected, { Category = item.Category, ItemKey = item.ItemKey })
                         end
@@ -468,10 +485,7 @@ local function buildUI()
                     if #selected > 0 then
                         local userId = lookupRecipient(recipient)
                         if userId then
-                            local payload = {}
-                            for _, it in ipairs(selected) do
-                                table.insert(payload, { Category = it.Category, ItemKey = it.ItemKey, Count = 1 })
-                            end
+                            local payload = buildPayload(selected)
                             sendMailBatch(userId, payload, "")
                         end
                     end
@@ -479,53 +493,64 @@ local function buildUI()
                 end
             end)
         else
-            notify("Auto Gift", "Stopped")
+            notify("⏹ Auto Gift", "Stopped", 1.5)
         end
     end)
-    
+
     -- ============================================================
-    -- DATA & FUNGSI
+    -- FUNGSI INTERNAL
     -- ============================================================
-    local allItems = {}
-    
-    local function refreshItems()
+    local function refreshInventory()
         local entries = collectInventoryEntries()
-        allItems = {}
-        for _, entry in ipairs(entries) do
-            local cat = entry.Category
-            if cat == "Seeds" or cat == "Gear" or cat == "Crops" or cat == "Pets" then
-                table.insert(allItems, {
-                    DisplayName = entry.DisplayName,
-                    ItemKey = entry.ItemKey,
-                    Category = cat,
-                    Quantity = entry.Quantity,
-                    selected = false,
-                })
+        giftState.allItems = {}
+        -- Jika dari replica tidak ada, pakai database sebagai fallback
+        if #entries == 0 then
+            for cat, list in pairs(ITEM_DB) do
+                for _, name in ipairs(list) do
+                    table.insert(giftState.allItems, {
+                        DisplayName = name,
+                        ItemKey = name,
+                        Category = cat,
+                        Quantity = 1,
+                        selected = false,
+                    })
+                end
+            end
+        else
+            for _, entry in ipairs(entries) do
+                local cat = entry.Category
+                if cat == "Seeds" or cat == "Gear" or cat == "Crops" or cat == "Pets" then
+                    table.insert(giftState.allItems, {
+                        DisplayName = entry.DisplayName,
+                        ItemKey = entry.ItemKey,
+                        Category = cat,
+                        Quantity = entry.Quantity,
+                        selected = false,
+                    })
+                end
             end
         end
         updateItemList()
-        notify("Sync", #allItems .. " items found")
     end
-    
+
     local function updateItemList()
-        -- Hapus semua item dari itemFrame
         for _, child in ipairs(itemFrame:GetChildren()) do
             if child:IsA("TextButton") then child:Destroy() end
         end
-        
-        local query = searchQuery
-        local cat = currentCategory
+
+        local query = giftState.searchQuery
+        local cat = giftState.currentCategory
         local count = 0
-        for _, item in ipairs(allItems) do
+        for _, item in ipairs(giftState.allItems) do
             if item.Category == cat then
-                local nameLower = item.DisplayName:lower()
+                local nameLower = tostring(item.DisplayName):lower()
                 if query == "" or nameLower:find(query, 1, true) then
                     local btn = Instance.new("TextButton")
-                    btn.Size = UDim2.new(1,0,0,22)
+                    btn.Size = UDim2.new(1,0,0,20)
                     btn.BackgroundColor3 = item.selected and Color3.fromRGB(90,150,90) or Color3.fromRGB(60,60,60)
                     btn.TextColor3 = Color3.fromRGB(235,235,235)
                     btn.Font = Enum.Font.Gotham
-                    btn.TextSize = 11
+                    btn.TextSize = 10
                     btn.Text = item.DisplayName .. " (" .. item.Quantity .. ")"
                     btn.Parent = itemFrame
                     btn.MouseButton1Click:Connect(function()
@@ -543,25 +568,143 @@ local function buildUI()
             empty.Font = Enum.Font.Gotham
             empty.Text = "No items found"
             empty.TextColor3 = Color3.fromRGB(180,180,180)
-            empty.TextSize = 12
-            empty.Size = UDim2.new(1,0,0,22)
+            empty.TextSize = 11
+            empty.Size = UDim2.new(1,0,0,20)
             empty.Parent = itemFrame
         end
     end
-    
-    -- Initial load
-    refreshItems()
-    
-    -- Real-time sync setiap 0.01 detik (tanpa UI)
+
+    refreshInventory()
+
+    -- REAL-TIME SYNC (setiap 0.01 detik, tanpa UI)
     task.spawn(function()
         while true do
-            if not screen or not screen.Parent then break end
-            refreshItems()
+            if not panel or not panel.Parent then break end
+            refreshInventory()
             task.wait(0.01)
         end
     end)
-    
-    -- Drag functionality
+end
+
+-- ============================================================
+-- 7. BUILD UI UTAMA (Dengan Sidebar Tab)
+-- ============================================================
+local function buildUI()
+    local old = PlayerGui:FindFirstChild("HubGUI")
+    if old then old:Destroy() end
+
+    local screen = Instance.new("ScreenGui")
+    screen.Name = "HubGUI"
+    screen.IgnoreGuiInset = true
+    screen.Parent = PlayerGui
+
+    -- Main frame (lebih ramping: width 380, height 540)
+    local mainFrame = Instance.new("Frame")
+    mainFrame.Size = UDim2.new(0, 380, 0, 540)
+    mainFrame.Position = UDim2.new(0.5, -190, 0.05, 0)
+    mainFrame.BackgroundColor3 = Color3.fromRGB(20,18,28)
+    mainFrame.BorderSizePixel = 0
+    mainFrame.Active = true
+    mainFrame.Draggable = true
+    mainFrame.Parent = screen
+
+    -- Title bar
+    local titleBar = Instance.new("Frame")
+    titleBar.BackgroundColor3 = Color3.fromRGB(40,30,48)
+    titleBar.BorderSizePixel = 0
+    titleBar.Size = UDim2.new(1,0,0,30)
+    titleBar.Parent = mainFrame
+
+    local titleLabel = Instance.new("TextLabel")
+    titleLabel.BackgroundTransparency = 1
+    titleLabel.Font = Enum.Font.GothamBold
+    titleLabel.Text = "🌱 " .. PlayerName .. "'s Hub"
+    titleLabel.TextColor3 = Color3.fromRGB(230,200,240)
+    titleLabel.TextSize = 14
+    titleLabel.TextXAlignment = Enum.TextXAlignment.Center
+    titleLabel.Position = UDim2.new(0,0,0,0)
+    titleLabel.Size = UDim2.new(1,0,1,0)
+    titleLabel.Parent = titleBar
+
+    -- Sidebar (kiri)
+    local sidebar = Instance.new("Frame")
+    sidebar.BackgroundColor3 = Color3.fromRGB(34,34,38)
+    sidebar.BorderSizePixel = 0
+    sidebar.Size = UDim2.new(0, 70, 1, -30)
+    sidebar.Position = UDim2.new(0, 0, 0, 30)
+    sidebar.Parent = mainFrame
+    Instance.new("UICorner", sidebar).CornerRadius = UDim.new(0, 4)
+
+    local sidebarLayout = Instance.new("UIListLayout")
+    sidebarLayout.Padding = UDim.new(0, 6)
+    sidebarLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+    sidebarLayout.VerticalAlignment = Enum.VerticalAlignment.Top
+    sidebarLayout.Parent = sidebar
+
+    -- Content area (kanan)
+    local content = Instance.new("Frame")
+    content.BackgroundTransparency = 1
+    content.Size = UDim2.new(1, -80, 1, -30)
+    content.Position = UDim2.new(0, 76, 0, 30)
+    content.Parent = mainFrame
+
+    -- Panel container (untuk setiap tab)
+    local panels = {}
+    local tabBtns = {}
+
+    local function createTab(label, name, builder)
+        -- Tombol di sidebar
+        local btn = Instance.new("TextButton")
+        btn.Size = UDim2.new(0, 60, 0, 28)
+        btn.BackgroundColor3 = Color3.fromRGB(50,50,56)
+        btn.TextColor3 = Color3.fromRGB(240,240,240)
+        btn.Text = label
+        btn.Font = Enum.Font.GothamSemibold
+        btn.TextSize = 10
+        btn.AutoButtonColor = true
+        btn.Parent = sidebar
+        Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 4)
+
+        -- Panel di content
+        local panel = Instance.new("ScrollingFrame")
+        panel.BackgroundColor3 = Color3.fromRGB(38,38,38)
+        panel.BorderSizePixel = 0
+        panel.Size = UDim2.new(1, 0, 1, 0)
+        panel.ScrollBarThickness = 4
+        panel.Visible = false
+        panel.Parent = content
+
+        local layout = Instance.new("UIListLayout")
+        layout.Padding = UDim.new(0, 4)
+        layout.SortOrder = Enum.SortOrder.LayoutOrder
+        layout.Parent = panel
+
+        panels[name] = panel
+        tabBtns[name] = btn
+
+        btn.MouseButton1Click:Connect(function()
+            for _, p in pairs(panels) do p.Visible = false end
+            for _, b in pairs(tabBtns) do b.BackgroundColor3 = Color3.fromRGB(50,50,56) end
+            panel.Visible = true
+            btn.BackgroundColor3 = Color3.fromRGB(88,136,186)
+            -- Update canvas size
+            panel.CanvasSize = UDim2.new(0,0,0, layout.AbsoluteContentSize.Y + 20)
+        end)
+
+        if builder then builder(panel) end
+        return panel
+    end
+
+    -- Buat tab "Gift" saja untuk sekarang
+    createTab("📨 Gift", "Gift", buildGiftPanel)
+
+    -- Aktifkan tab pertama
+    panels.Gift.Visible = true
+    tabBtns.Gift.BackgroundColor3 = Color3.fromRGB(88,136,186)
+
+    -- ============================================================
+    -- DRAG (menggunakan titleBar)
+    -- ============================================================
     local dragging = false
     local dragStart, frameStart
     titleBar.InputBegan:Connect(function(input)
@@ -587,29 +730,28 @@ local function buildUI()
             mainFrame.Position = UDim2.new(0, math.clamp(newX,0,maxX), 0, math.clamp(newY,0,maxY))
         end
     end)
-    
+
     -- Animate in
     mainFrame.BackgroundTransparency = 1
     TweenService:Create(mainFrame, TweenInfo.new(0.2), { BackgroundTransparency = 0 }):Play()
-    mainFrame.Position = UDim2.new(0.5,-225,0.1,50)
+    mainFrame.Position = UDim2.new(0.5, -190, 0.05, 40)
     TweenService:Create(mainFrame, TweenInfo.new(0.3, Enum.EasingStyle.Back), {
-        Position = UDim2.new(0.5,-225,0.1,0)
+        Position = UDim2.new(0.5, -190, 0.05, 0)
     }):Play()
-    
+
     return screen
 end
 
 -- ============================================================
--- START
+-- 8. START
 -- ============================================================
 local function init()
-    if PlayerGui:GetAttribute("GiftHubInitialized") then return end
-    PlayerGui:SetAttribute("GiftHubInitialized", true)
-    notify("Loading", "Auto Gift Mail...")
-    delay(0.5, function()
-        pcall(buildUI)
-    end)
+    if PlayerGui:GetAttribute("HubInitialized") then return end
+    PlayerGui:SetAttribute("HubInitialized", true)
+    notify("📨 Gift Panel", "Welcome " .. PlayerName, 2)
+    delay(0.5, function() pcall(buildUI) end)
 end
 
 spawn(init)
-print("📨 Auto Gift Mail script loaded!")
+print("📨 Auto Gift Mail with Sidebar Tab loaded!")
+print("🌱 Seeds: " .. #ITEM_DB.Seeds .. ", Pets: " .. #ITEM_DB.Pets)
