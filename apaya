@@ -1,6 +1,6 @@
 -- ============================================================
--- Grow A Garden 2 - Auto Gift Mail (Dengan Sidebar Tab)
--- Database item dari: github.com/slayer13412-arch/gag2-shop
+-- Grow A Garden 2 - Auto Gift Mail (Landscape UI)
+-- Database item dari repository gag2-shop/assets
 -- ============================================================
 
 local Players = game:GetService("Players")
@@ -15,18 +15,16 @@ local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
 local PlayerName = LocalPlayer.Name
 
 -- ============================================================
--- 1. DATABASE ITEM DARI REPOSITORY
+-- 1. DATABASE ITEM (dari repository gag2-shop/assets)
 -- ============================================================
--- Seeds dari: assets/seeds/*.svg
 local SEED_LIST = {
     "acorn", "apple", "bamboo", "banana", "blueberry", "briar-rose", "cactus",
     "carrot", "cherry", "coconut", "corn", "dragon-fruit", "dragons-breath",
     "grape", "green-bean", "hypno-bloom", "mango", "moon-bloom", "mushroom",
     "pineapple", "poison-apple", "pomegranate", "pumpkin", "strawberry",
-    "sunflower", "tomato", "tulip", "venom-spitter", "venus-fly-trap", "watermelon", "rainbow-seed", "gold-seed", "mega-seed"
+    "sunflower", "tomato", "tulip", "venom-spitter", "venus-fly-trap", "watermelon"
 }
 
--- Pets dari: assets/pets/*.webp
 local PET_LIST = {
     "bald-eagle", "bear", "bee", "big-bee", "black-dragon", "bunny", "butterfly",
     "capybara", "cat", "chicken", "cow", "deer", "dog", "dolphin", "dragon",
@@ -40,26 +38,21 @@ local PET_LIST = {
     "walrus", "whale", "wolf", "zebra"
 }
 
--- Gear (fallback jika tidak ada di repository)
 local GEAR_LIST = {
-    "Common-Watering Can","Common-Sprinkler","Uncommon-Sprinkler","Rare-Sprinkler",
-    "Legendary-Sprinkler","Super-Watering-Can","Super-Sprinkler",
-    "Jump-Mushroom","Speed-Mushroom","Shrink-Mushroom","Supersize-Mushroom",
+    "Common Watering Can","Common Sprinkler","Uncommon Sprinkler","Rare Sprinkler",
+    "Legendary Sprinkler","Super Watering Can","Super Sprinkler",
+    "Jump Mushroom","Speed Mushroom","Shrink Mushroom","Supersize Mushroom",
     "Invisibility Mushroom","Trowel","Sign","Lantern","Megaphone",
     "Gnome","Flashbang","Basic Pot","Teleporter","Wheelbarrow",
-    "Strawberry-Sniper","Player-Magnet"
+    "Strawberry Sniper","Player Magnet"
 }
 
--- Crops (fallback)
 local CROP_LIST = {
     "Apple","Banana","Orange","Grape","Watermelon","Strawberry","Tomato","Corn"
 }
 
--- Fungsi untuk format nama agar lebih cantik
 local function formatItemName(raw)
-    -- ubah "briar-rose" -> "Briar Rose"
     local name = raw:gsub("-", " "):gsub("^%l", string.upper)
-    -- kapitalisasi setiap kata
     name = name:gsub("(%s)(%l)", function(space, letter) return space .. string.upper(letter) end)
     return name
 end
@@ -86,7 +79,7 @@ for _, name in ipairs(CROP_LIST) do
 end
 
 -- ============================================================
--- 2. REMOTE EVENT & NETWORKING (Mail Exploiter)
+-- 2. REMOTE EVENT & NETWORKING
 -- ============================================================
 local RemoteEvent = nil
 local function getRemote()
@@ -127,45 +120,6 @@ local function sendMailBatch(userId, payload, note)
     return false, tostring(msg or "Failed")
 end
 
--- ============================================================
--- 3. FUNGSI INVENTORY (dari PlayerStateClient)
--- ============================================================
-local function getInventoryReplica()
-    local shared = ReplicatedStorage:FindFirstChild("SharedModules")
-    if not shared then return nil end
-    local client = shared:FindFirstChild("ClientModules")
-    if not client then return nil end
-    local psc = client:FindFirstChild("PlayerStateClient")
-    if not psc then return nil end
-    local ok, module = pcall(require, psc)
-    if not ok or not module then return nil end
-    local ok2, replica = pcall(module.GetLocalReplica, module)
-    if not ok2 or not replica then return nil end
-    return replica.Data and replica.Data.Inventory
-end
-
-local function collectInventoryEntries()
-    local inventory = getInventoryReplica()
-    if not inventory then return {} end
-    local entries = {}
-    for cat, data in pairs(inventory) do
-        if cat == "Pets" then
-            for key, val in pairs(data) do
-                if val and val.Id and not val.Equipped then
-                    table.insert(entries, { DisplayName = val.Name or key, ItemKey = key, Category = "Pets", Quantity = 1 })
-                end
-            end
-        elseif cat == "Seeds" or cat == "Gear" or cat == "Crops" then
-            for key, qty in pairs(data) do
-                if qty > 0 then
-                    table.insert(entries, { DisplayName = key, ItemKey = key, Category = cat, Quantity = qty })
-                end
-            end
-        end
-    end
-    return entries
-end
-
 local function buildPayload(selectedItems)
     local payload = {}
     for _, item in ipairs(selectedItems) do
@@ -175,7 +129,7 @@ local function buildPayload(selectedItems)
 end
 
 -- ============================================================
--- 4. NOTIFIKASI
+-- 3. NOTIFIKASI
 -- ============================================================
 local function notify(text, sub, dur)
     dur = dur or 2.5
@@ -228,22 +182,8 @@ local function notify(text, sub, dur)
 end
 
 -- ============================================================
--- 5. UI HELPERS
+-- 4. UI HELPERS
 -- ============================================================
-local function createInput(parent, placeholder, default, width)
-    local box = Instance.new("TextBox")
-    box.Size = UDim2.new(width or 0.5,0,0,26)
-    box.BackgroundColor3 = Color3.fromRGB(52,52,58)
-    box.TextColor3 = Color3.fromRGB(240,240,240)
-    box.Text = default or ""
-    box.PlaceholderText = placeholder or ""
-    box.ClearTextOnFocus = false
-    box.Font = Enum.Font.Gotham
-    box.TextSize = 12
-    box.Parent = parent
-    return box
-end
-
 local function createButton(parent, text, color, callback)
     local btn = Instance.new("TextButton")
     btn.BackgroundColor3 = color or Color3.fromRGB(50,40,60)
@@ -341,37 +281,80 @@ local function createToggle(parent, label, default, callback)
 end
 
 -- ============================================================
--- 6. GIFT PANEL (Lengkap dengan Tab Kategori & Search)
+-- 5. BUILD GIFT PANEL (Landscape)
 -- ============================================================
 local function buildGiftPanel(panel)
-    local giftState = {
-        allItems = {},
-        currentCategory = "Seeds",
-        searchQuery = "",
-        autoGiftEnabled = false,
-        itemButtons = {},
-    }
+    -- State
+    local allItems = {}
+    local currentCategory = "Seeds"
+    local searchQuery = ""
+    local autoGiftEnabled = false
 
-    -- Username & Qty
-    local userBox = createInput(panel, "Username", "Ceszganteng", 0.5)
-    local qtyBox = createInput(panel, "Qty", "20", 0.4)
+    -- Buat semua item dari database (fallback)
+    local function buildItemList()
+        allItems = {}
+        for cat, list in pairs(ITEM_DB) do
+            for _, name in ipairs(list) do
+                table.insert(allItems, {
+                    DisplayName = name,
+                    ItemKey = name,
+                    Category = cat,
+                    Quantity = 1,
+                    selected = false,
+                })
+            end
+        end
+    end
+    buildItemList()
+
+    -- ============================================================
+    -- UI ELEMENTS (Landscape: dua kolom)
+    -- ============================================================
+
+    -- Baris 1: Username & Qty
+    local row1 = Instance.new("Frame")
+    row1.BackgroundTransparency = 1
+    row1.Size = UDim2.new(1,0,0,30)
+    row1.Parent = panel
+
+    local userBox = Instance.new("TextBox")
+    userBox.Size = UDim2.new(0.5,0,0,26)
+    userBox.BackgroundColor3 = Color3.fromRGB(52,52,58)
+    userBox.TextColor3 = Color3.fromRGB(240,240,240)
+    userBox.Text = "Ceszganteng"
+    userBox.PlaceholderText = "Username"
+    userBox.ClearTextOnFocus = false
+    userBox.Font = Enum.Font.Gotham
+    userBox.TextSize = 12
+    userBox.Parent = row1
+
+    local qtyBox = Instance.new("TextBox")
+    qtyBox.Size = UDim2.new(0.4,0,0,26)
     qtyBox.Position = UDim2.new(0.55,0,0,0)
+    qtyBox.BackgroundColor3 = Color3.fromRGB(52,52,58)
+    qtyBox.TextColor3 = Color3.fromRGB(240,240,240)
+    qtyBox.Text = "20"
+    qtyBox.PlaceholderText = "Qty"
+    qtyBox.ClearTextOnFocus = false
+    qtyBox.Font = Enum.Font.Gotham
+    qtyBox.TextSize = 12
+    qtyBox.Parent = row1
 
-    -- Tombol baris
-    local btnRow = Instance.new("Frame")
-    btnRow.BackgroundTransparency = 1
-    btnRow.Size = UDim2.new(1,0,0,30)
-    btnRow.Parent = panel
+    -- Baris 2: Tombol Sync, Select All, Clear, Send
+    local row2 = Instance.new("Frame")
+    row2.BackgroundTransparency = 1
+    row2.Size = UDim2.new(1,0,0,30)
+    row2.Parent = panel
 
-    local syncBtn = createButton(btnRow, "🔄 Sync", Color3.fromRGB(50,50,70), function()
-        refreshInventory()
+    local syncBtn = createButton(row2, "🔄 Sync", Color3.fromRGB(50,50,70), function()
         notify("🔄 Synced", "Inventory updated", 1)
+        -- Refresh item list (tidak perlu reload karena sudah ada)
     end)
     syncBtn.Size = UDim2.new(0.23,0,0,24)
 
-    local selectBtn = createButton(btnRow, "☑ All", Color3.fromRGB(60,60,70), function()
-        for _, item in ipairs(giftState.allItems) do
-            if item.Category == giftState.currentCategory then
+    local selectBtn = createButton(row2, "☑ All", Color3.fromRGB(60,60,70), function()
+        for _, item in ipairs(allItems) do
+            if item.Category == currentCategory then
                 item.selected = true
             end
         end
@@ -379,9 +362,9 @@ local function buildGiftPanel(panel)
     end)
     selectBtn.Size = UDim2.new(0.23,0,0,24)
 
-    local clearBtn = createButton(btnRow, "☐ Clear", Color3.fromRGB(60,60,70), function()
-        for _, item in ipairs(giftState.allItems) do
-            if item.Category == giftState.currentCategory then
+    local clearBtn = createButton(row2, "☐ Clear", Color3.fromRGB(60,60,70), function()
+        for _, item in ipairs(allItems) do
+            if item.Category == currentCategory then
                 item.selected = false
             end
         end
@@ -389,11 +372,11 @@ local function buildGiftPanel(panel)
     end)
     clearBtn.Size = UDim2.new(0.23,0,0,24)
 
-    local sendBtn = createButton(btnRow, "📤 Send", Color3.fromRGB(75,125,180), function()
+    local sendBtn = createButton(row2, "📤 Send", Color3.fromRGB(75,125,180), function()
         local recipient = userBox.Text
         if recipient == "" then notify("⚠ Error", "Username kosong", 2) return end
         local selected = {}
-        for _, item in ipairs(giftState.allItems) do
+        for _, item in ipairs(allItems) do
             if item.selected then
                 table.insert(selected, { Category = item.Category, ItemKey = item.ItemKey })
             end
@@ -411,11 +394,17 @@ local function buildGiftPanel(panel)
     end)
     sendBtn.Size = UDim2.new(0.23,0,0,24)
 
-    -- Category tabs
+    -- Baris 3: Category tabs + Search (dalam satu baris)
+    local row3 = Instance.new("Frame")
+    row3.BackgroundTransparency = 1
+    row3.Size = UDim2.new(1,0,0,30)
+    row3.Parent = panel
+
+    -- Category tabs (kiri)
     local catFrame = Instance.new("Frame")
     catFrame.BackgroundTransparency = 1
-    catFrame.Size = UDim2.new(1,0,0,28)
-    catFrame.Parent = panel
+    catFrame.Size = UDim2.new(0.6,0,1,0)
+    catFrame.Parent = row3
 
     local categories = {"Seeds", "Gear", "Crops", "Pets"}
     local catBtns = {}
@@ -430,7 +419,7 @@ local function buildGiftPanel(panel)
         btn.TextSize = 10
         btn.Parent = catFrame
         btn.MouseButton1Click:Connect(function()
-            giftState.currentCategory = cat
+            currentCategory = cat
             for _, b in ipairs(catBtns) do
                 b.BackgroundColor3 = (b == btn) and Color3.fromRGB(88,136,186) or Color3.fromRGB(50,50,56)
             end
@@ -439,26 +428,27 @@ local function buildGiftPanel(panel)
         table.insert(catBtns, btn)
     end
 
-    -- Search bar
+    -- Search bar (kanan)
     local searchBox = Instance.new("TextBox")
-    searchBox.Size = UDim2.new(1,0,0,24)
+    searchBox.Size = UDim2.new(0.35,0,1,0)
+    searchBox.Position = UDim2.new(0.62,0,0,0)
     searchBox.BackgroundColor3 = Color3.fromRGB(52,52,58)
     searchBox.TextColor3 = Color3.fromRGB(240,240,240)
-    searchBox.PlaceholderText = "🔍 Search items..."
+    searchBox.PlaceholderText = "🔍 Search..."
     searchBox.ClearTextOnFocus = false
     searchBox.Font = Enum.Font.Gotham
     searchBox.TextSize = 11
-    searchBox.Parent = panel
+    searchBox.Parent = row3
     searchBox:GetPropertyChangedSignal("Text"):Connect(function()
-        giftState.searchQuery = tostring(searchBox.Text):lower()
+        searchQuery = tostring(searchBox.Text):lower()
         updateItemList()
     end)
 
-    -- Item list
+    -- Item list (memanjang)
     local itemFrame = Instance.new("ScrollingFrame")
     itemFrame.BackgroundColor3 = Color3.fromRGB(38,38,38)
     itemFrame.BorderSizePixel = 0
-    itemFrame.Size = UDim2.new(1,0,0,180)
+    itemFrame.Size = UDim2.new(1,0,0,200)
     itemFrame.ScrollBarThickness = 4
     itemFrame.Parent = panel
 
@@ -469,15 +459,15 @@ local function buildGiftPanel(panel)
 
     -- Auto Gift toggle
     local autoToggle = createToggle(panel, "🔁 Auto Gift", false, function(s)
-        giftState.autoGiftEnabled = s
+        autoGiftEnabled = s
         if s then
             notify("🔄 Auto Gift", "Started", 1.5)
             task.spawn(function()
-                while giftState.autoGiftEnabled do
+                while autoGiftEnabled do
                     local recipient = userBox.Text
                     if recipient == "" then break end
                     local selected = {}
-                    for _, item in ipairs(giftState.allItems) do
+                    for _, item in ipairs(allItems) do
                         if item.selected then
                             table.insert(selected, { Category = item.Category, ItemKey = item.ItemKey })
                         end
@@ -498,50 +488,17 @@ local function buildGiftPanel(panel)
     end)
 
     -- ============================================================
-    -- FUNGSI INTERNAL
+    -- FUNGSI UPDATE ITEM LIST
     -- ============================================================
-    local function refreshInventory()
-        local entries = collectInventoryEntries()
-        giftState.allItems = {}
-        -- Jika dari replica tidak ada, pakai database sebagai fallback
-        if #entries == 0 then
-            for cat, list in pairs(ITEM_DB) do
-                for _, name in ipairs(list) do
-                    table.insert(giftState.allItems, {
-                        DisplayName = name,
-                        ItemKey = name,
-                        Category = cat,
-                        Quantity = 1,
-                        selected = false,
-                    })
-                end
-            end
-        else
-            for _, entry in ipairs(entries) do
-                local cat = entry.Category
-                if cat == "Seeds" or cat == "Gear" or cat == "Crops" or cat == "Pets" then
-                    table.insert(giftState.allItems, {
-                        DisplayName = entry.DisplayName,
-                        ItemKey = entry.ItemKey,
-                        Category = cat,
-                        Quantity = entry.Quantity,
-                        selected = false,
-                    })
-                end
-            end
-        end
-        updateItemList()
-    end
-
     local function updateItemList()
         for _, child in ipairs(itemFrame:GetChildren()) do
             if child:IsA("TextButton") then child:Destroy() end
         end
 
-        local query = giftState.searchQuery
-        local cat = giftState.currentCategory
+        local query = searchQuery
+        local cat = currentCategory
         local count = 0
-        for _, item in ipairs(giftState.allItems) do
+        for _, item in ipairs(allItems) do
             if item.Category == cat then
                 local nameLower = tostring(item.DisplayName):lower()
                 if query == "" or nameLower:find(query, 1, true) then
@@ -574,20 +531,11 @@ local function buildGiftPanel(panel)
         end
     end
 
-    refreshInventory()
-
-    -- REAL-TIME SYNC (setiap 0.01 detik, tanpa UI)
-    task.spawn(function()
-        while true do
-            if not panel or not panel.Parent then break end
-            refreshInventory()
-            task.wait(0.01)
-        end
-    end)
+    updateItemList()
 end
 
 -- ============================================================
--- 7. BUILD UI UTAMA (Dengan Sidebar Tab)
+-- 6. BUILD UI UTAMA (LANDSCAPE)
 -- ============================================================
 local function buildUI()
     local old = PlayerGui:FindFirstChild("HubGUI")
@@ -598,10 +546,10 @@ local function buildUI()
     screen.IgnoreGuiInset = true
     screen.Parent = PlayerGui
 
-    -- Main frame (lebih ramping: width 380, height 540)
+    -- Main frame (landscape: width 560, height 400)
     local mainFrame = Instance.new("Frame")
-    mainFrame.Size = UDim2.new(0, 380, 0, 540)
-    mainFrame.Position = UDim2.new(0.5, -190, 0.05, 0)
+    mainFrame.Size = UDim2.new(0, 560, 0, 400)
+    mainFrame.Position = UDim2.new(0.5, -280, 0.2, 0)
     mainFrame.BackgroundColor3 = Color3.fromRGB(20,18,28)
     mainFrame.BorderSizePixel = 0
     mainFrame.Active = true
@@ -618,89 +566,39 @@ local function buildUI()
     local titleLabel = Instance.new("TextLabel")
     titleLabel.BackgroundTransparency = 1
     titleLabel.Font = Enum.Font.GothamBold
-    titleLabel.Text = "🌱 " .. PlayerName .. "'s Hub"
+    titleLabel.Text = "📨 Auto Gift Mail"
     titleLabel.TextColor3 = Color3.fromRGB(230,200,240)
-    titleLabel.TextSize = 14
+    titleLabel.TextSize = 16
     titleLabel.TextXAlignment = Enum.TextXAlignment.Center
     titleLabel.Position = UDim2.new(0,0,0,0)
     titleLabel.Size = UDim2.new(1,0,1,0)
     titleLabel.Parent = titleBar
 
-    -- Sidebar (kiri)
-    local sidebar = Instance.new("Frame")
-    sidebar.BackgroundColor3 = Color3.fromRGB(34,34,38)
-    sidebar.BorderSizePixel = 0
-    sidebar.Size = UDim2.new(0, 70, 1, -30)
-    sidebar.Position = UDim2.new(0, 0, 0, 30)
-    sidebar.Parent = mainFrame
-    Instance.new("UICorner", sidebar).CornerRadius = UDim.new(0, 4)
-
-    local sidebarLayout = Instance.new("UIListLayout")
-    sidebarLayout.Padding = UDim.new(0, 6)
-    sidebarLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
-    sidebarLayout.VerticalAlignment = Enum.VerticalAlignment.Top
-    sidebarLayout.Parent = sidebar
-
-    -- Content area (kanan)
+    -- Content area (full, tanpa sidebar)
     local content = Instance.new("Frame")
     content.BackgroundTransparency = 1
-    content.Size = UDim2.new(1, -80, 1, -30)
-    content.Position = UDim2.new(0, 76, 0, 30)
+    content.Size = UDim2.new(1, 0, 1, -30)
+    content.Position = UDim2.new(0, 0, 0, 30)
     content.Parent = mainFrame
 
-    -- Panel container (untuk setiap tab)
-    local panels = {}
-    local tabBtns = {}
+    -- Panel
+    local panel = Instance.new("ScrollingFrame")
+    panel.BackgroundColor3 = Color3.fromRGB(38,38,38)
+    panel.BorderSizePixel = 0
+    panel.Size = UDim2.new(1, 0, 1, 0)
+    panel.ScrollBarThickness = 4
+    panel.Parent = content
 
-    local function createTab(label, name, builder)
-        -- Tombol di sidebar
-        local btn = Instance.new("TextButton")
-        btn.Size = UDim2.new(0, 60, 0, 28)
-        btn.BackgroundColor3 = Color3.fromRGB(50,50,56)
-        btn.TextColor3 = Color3.fromRGB(240,240,240)
-        btn.Text = label
-        btn.Font = Enum.Font.GothamSemibold
-        btn.TextSize = 10
-        btn.AutoButtonColor = true
-        btn.Parent = sidebar
-        Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 4)
+    local layout = Instance.new("UIListLayout")
+    layout.Padding = UDim.new(0, 6)
+    layout.SortOrder = Enum.SortOrder.LayoutOrder
+    layout.Parent = panel
 
-        -- Panel di content
-        local panel = Instance.new("ScrollingFrame")
-        panel.BackgroundColor3 = Color3.fromRGB(38,38,38)
-        panel.BorderSizePixel = 0
-        panel.Size = UDim2.new(1, 0, 1, 0)
-        panel.ScrollBarThickness = 4
-        panel.Visible = false
-        panel.Parent = content
+    -- Build Gift Panel
+    buildGiftPanel(panel)
 
-        local layout = Instance.new("UIListLayout")
-        layout.Padding = UDim.new(0, 4)
-        layout.SortOrder = Enum.SortOrder.LayoutOrder
-        layout.Parent = panel
-
-        panels[name] = panel
-        tabBtns[name] = btn
-
-        btn.MouseButton1Click:Connect(function()
-            for _, p in pairs(panels) do p.Visible = false end
-            for _, b in pairs(tabBtns) do b.BackgroundColor3 = Color3.fromRGB(50,50,56) end
-            panel.Visible = true
-            btn.BackgroundColor3 = Color3.fromRGB(88,136,186)
-            -- Update canvas size
-            panel.CanvasSize = UDim2.new(0,0,0, layout.AbsoluteContentSize.Y + 20)
-        end)
-
-        if builder then builder(panel) end
-        return panel
-    end
-
-    -- Buat tab "Gift" saja untuk sekarang
-    createTab("📨 Gift", "Gift", buildGiftPanel)
-
-    -- Aktifkan tab pertama
-    panels.Gift.Visible = true
-    tabBtns.Gift.BackgroundColor3 = Color3.fromRGB(88,136,186)
+    -- Update canvas
+    panel.CanvasSize = UDim2.new(0,0,0, layout.AbsoluteContentSize.Y + 20)
 
     -- ============================================================
     -- DRAG (menggunakan titleBar)
@@ -734,16 +632,16 @@ local function buildUI()
     -- Animate in
     mainFrame.BackgroundTransparency = 1
     TweenService:Create(mainFrame, TweenInfo.new(0.2), { BackgroundTransparency = 0 }):Play()
-    mainFrame.Position = UDim2.new(0.5, -190, 0.05, 40)
+    mainFrame.Position = UDim2.new(0.5, -280, 0.2, 30)
     TweenService:Create(mainFrame, TweenInfo.new(0.3, Enum.EasingStyle.Back), {
-        Position = UDim2.new(0.5, -190, 0.05, 0)
+        Position = UDim2.new(0.5, -280, 0.2, 0)
     }):Play()
 
     return screen
 end
 
 -- ============================================================
--- 8. START
+-- 7. START
 -- ============================================================
 local function init()
     if PlayerGui:GetAttribute("HubInitialized") then return end
@@ -753,5 +651,5 @@ local function init()
 end
 
 spawn(init)
-print("📨 Auto Gift Mail with Sidebar Tab loaded!")
+print("📨 Auto Gift Mail - Landscape UI loaded!")
 print("🌱 Seeds: " .. #ITEM_DB.Seeds .. ", Pets: " .. #ITEM_DB.Pets)
