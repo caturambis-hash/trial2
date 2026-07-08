@@ -137,13 +137,14 @@ local GEAR_CATEGORIES = {
 
 local function mapInventoryCategoryToUiCategory(category)
     local name = tostring(category or "")
-    if name == "Pets" then
+    local lower = name:lower()
+    if lower == "pets" or lower == "pet" then
         return "Pets"
     end
-    if name == "Seeds" or name == "SeedPacks" or name:lower():find("seed") then
+    if lower == "seeds" or lower == "seed" or lower == "seedpacks" or lower == "seedpack" then
         return "Seeds"
     end
-    if GEAR_CATEGORIES[name] or name:lower():find("sprinkler") or name:lower():find("watering") or name:lower():find("mushroom") or name:lower():find("gnome") or name:lower():find("raccoon") or name:lower():find("crate") or name:lower():find("trowel") or name:lower():find("prop") then
+    if lower == "gear" or lower == "gears" or lower == "items" or GEAR_CATEGORIES[name] then
         return "Gear"
     end
     return nil
@@ -422,41 +423,6 @@ local function categorizeItem(name)
         end
     end
 
-    local seedTerms = {
-        "seed", "sapling", "sprout", "plant", "berry", "bean", "melon", "pumpkin", "carrot",
-        "potato", "corn", "wheat", "flower", "leaf", "grass", "tree", "root", "vine",
-        "tulip", "tomato", "apple", "bamboo", "cactus", "pineapple", "mushroom", "banana",
-        "grape", "coconut", "mango", "dragon fruit", "acorn", "cherry", "sunflower",
-        "venus fly trap", "pomegranate", "poison apple", "venom spitter", "moon bloom",
-        "hypno bloom", "dragon's breath"
-    }
-    local gearTerms = {
-        "watering", "shovel", "fertilizer", "harvester", "auto", "can", "hoe", "bucket",
-        "sprayer", "net", "glove", "scissors", "tractor", "cart", "hammer", "crate", "tool",
-        "sprinkler", "sign", "trowel", "lantern", "megaphone", "pot", "teleporter",
-        "wheelbarrow", "sniper", "magnet"
-    }
-    local petTerms = {
-        "dragon", "raccoon", "unicorn", "slime", "dog", "cat", "owl", "fox", "bunny",
-        "rabbit", "wolf", "bear", "panda", "phoenix", "griffin", "fairy", "horse", "snake",
-        "turtle", "penguin", "koala", "dino", "kitty", "puppy", "blob", "critter", "bee",
-        "robin", "frog", "monkey", "deer", "dragonfly"
-    }
-    for _, term in ipairs(seedTerms) do
-        if lower:find(term, 1, true) then
-            return "Seeds"
-        end
-    end
-    for _, term in ipairs(gearTerms) do
-        if lower:find(term, 1, true) then
-            return "Gear"
-        end
-    end
-    for _, term in ipairs(petTerms) do
-        if lower:find(term, 1, true) then
-            return "Pets"
-        end
-    end
     return "Other"
 end
 
@@ -1005,56 +971,29 @@ local function createMailGui()
 
     local hideUiButton = Instance.new("TextButton")
     hideUiButton.Name = "HideUiButton"
-    hideUiButton.Size = UDim2.new(0, 110, 0, 28)
-    hideUiButton.Position = UDim2.new(0.5, -125, 0.02, 0)
+    hideUiButton.Size = UDim2.new(0, 34, 0, 34)
+    hideUiButton.Position = UDim2.new(1, -42, 0, 6)
     hideUiButton.BackgroundColor3 = Color3.fromRGB(70, 120, 180)
     hideUiButton.TextColor3 = Color3.fromRGB(245, 245, 245)
     hideUiButton.Font = Enum.Font.GothamBold
-    hideUiButton.TextSize = 11
-    hideUiButton.Text = "Hide UI"
+    hideUiButton.TextSize = 12
+    hideUiButton.Text = "☼"
     hideUiButton.Parent = toggleScreen
-    Instance.new("UICorner", hideUiButton).CornerRadius = UDim.new(0, 8)
-
-    local scriptToggleButton = Instance.new("TextButton")
-    scriptToggleButton.Name = "ToggleScriptButton"
-    scriptToggleButton.Size = UDim2.new(0, 110, 0, 28)
-    scriptToggleButton.Position = UDim2.new(0.5, 0, 0.02, 0)
-    scriptToggleButton.BackgroundColor3 = Color3.fromRGB(175, 80, 80)
-    scriptToggleButton.TextColor3 = Color3.fromRGB(245, 245, 245)
-    scriptToggleButton.Font = Enum.Font.GothamBold
-    scriptToggleButton.TextSize = 11
-    scriptToggleButton.Text = "Close Script"
-    scriptToggleButton.Parent = toggleScreen
-    Instance.new("UICorner", scriptToggleButton).CornerRadius = UDim.new(0, 8)
+    Instance.new("UICorner", hideUiButton).CornerRadius = UDim.new(1, 0)
 
     hideUiButton.Activated:Connect(function()
         mainUiVisible = not mainUiVisible
         if frame then
             frame.Visible = mainUiVisible
         end
-        hideUiButton.Text = mainUiVisible and "Hide UI" or "Show UI"
+        hideUiButton.Text = mainUiVisible and "☼" or "☾"
         hideUiButton.BackgroundColor3 = mainUiVisible and Color3.fromRGB(70, 120, 180) or Color3.fromRGB(92, 92, 102)
-    end)
-
-    scriptToggleButton.Activated:Connect(function()
-        scriptActive = not scriptActive
-        scriptToggleButton.Text = scriptActive and "Close Script" or "Open Script"
-        scriptToggleButton.BackgroundColor3 = scriptActive and Color3.fromRGB(175, 80, 80) or Color3.fromRGB(90, 150, 90)
-        if not scriptActive then
-            autoBuySeedsEnabled = false
-            autoBuyGearsEnabled = false
-            autoClaimSeedDropEnabled = false
-            autoSkipTutorialEnabled = false
-            autoEnabled = false
-            updateAutoButton()
-        end
-        startAutomationLoop()
     end)
 
     frame = Instance.new("Frame")
     frame.Name = "MainFrame"
-    frame.Size = UDim2.new(0, 520, 0, 320)
-    frame.Position = UDim2.new(0.5, -260, 0.08, 0)
+    frame.Size = UDim2.new(0, 460, 0, 300)
+    frame.Position = UDim2.new(0.5, -230, 0.08, 0)
     frame.BackgroundColor3 = Color3.fromRGB(24, 24, 28)
     frame.BorderSizePixel = 0
     frame.Active = true
@@ -1068,13 +1007,13 @@ local function createMailGui()
     title.BackgroundTransparency = 1
     title.Text = "Grow A Garden 2 - Mail Exploiter"
     title.Font = Enum.Font.GothamBold
-    title.TextSize = 15
+    title.TextSize = 13
     title.TextColor3 = Color3.fromRGB(235, 235, 235)
     title.Parent = frame
 
     local sidebar = Instance.new("Frame")
     sidebar.Name = "Sidebar"
-    sidebar.Size = UDim2.new(0, 122, 1, -40)
+    sidebar.Size = UDim2.new(0, 104, 1, -40)
     sidebar.Position = UDim2.new(0, 10, 0, 40)
     sidebar.BackgroundColor3 = Color3.fromRGB(34, 34, 38)
     sidebar.BorderSizePixel = 0
@@ -1089,8 +1028,8 @@ local function createMailGui()
 
     local contentFrame = Instance.new("Frame")
     contentFrame.Name = "ContentFrame"
-    contentFrame.Size = UDim2.new(1, -170, 1, -50)
-    contentFrame.Position = UDim2.new(0, 160, 0, 42)
+    contentFrame.Size = UDim2.new(1, -140, 1, -50)
+    contentFrame.Position = UDim2.new(0, 118, 0, 42)
     contentFrame.BackgroundTransparency = 1
     contentFrame.Parent = frame
 
@@ -1124,40 +1063,8 @@ local function createMailGui()
     giftPanel.Parent = contentFrame
     giftPanel.Visible = true
 
-    local buySeedPanel = Instance.new("Frame")
-    buySeedPanel.Name = "BuySeedsPanel"
-    buySeedPanel.Size = UDim2.new(1, 0, 1, 0)
-    buySeedPanel.BackgroundTransparency = 1
-    buySeedPanel.Parent = contentFrame
-    buySeedPanel.Visible = false
-
-    local buyGearPanel = Instance.new("Frame")
-    buyGearPanel.Name = "BuyGearPanel"
-    buyGearPanel.Size = UDim2.new(1, 0, 1, 0)
-    buyGearPanel.BackgroundTransparency = 1
-    buyGearPanel.Parent = contentFrame
-    buyGearPanel.Visible = false
-
-    local claimPanel = Instance.new("Frame")
-    claimPanel.Name = "ClaimDropPanel"
-    claimPanel.Size = UDim2.new(1, 0, 1, 0)
-    claimPanel.BackgroundTransparency = 1
-    claimPanel.Parent = contentFrame
-    claimPanel.Visible = false
-
-    local tutorialPanel = Instance.new("Frame")
-    tutorialPanel.Name = "TutorialPanel"
-    tutorialPanel.Size = UDim2.new(1, 0, 1, 0)
-    tutorialPanel.BackgroundTransparency = 1
-    tutorialPanel.Parent = contentFrame
-    tutorialPanel.Visible = false
-
     local tabButtons = {}
     tabButtons.GiftMail = createTabButton("Gift Mail", "GiftMail")
-    tabButtons.BuySeed = createTabButton("Buy Seed", "BuySeed")
-    tabButtons.BuyGear = createTabButton("Buy Gear", "BuyGear")
-    tabButtons.ClaimDrop = createTabButton("Claim Drop Seed", "ClaimDrop")
-    tabButtons.SkipTutorial = createTabButton("Skip Tutorial", "SkipTutorial")
 
     function setActiveTab(tabName)
         for _, btn in pairs(tabButtons) do
@@ -1166,42 +1073,7 @@ local function createMailGui()
         if tabButtons[tabName] then
             tabButtons[tabName].BackgroundColor3 = Color3.fromRGB(88, 136, 186)
         end
-        giftPanel.Visible = tabName == "GiftMail"
-        buySeedPanel.Visible = tabName == "BuySeed"
-        buyGearPanel.Visible = tabName == "BuyGear"
-        claimPanel.Visible = tabName == "ClaimDrop"
-        tutorialPanel.Visible = tabName == "SkipTutorial"
-        if tabName == "GiftMail" then
-            giftPanel.ZIndex = 2
-            buySeedPanel.ZIndex = 1
-            buyGearPanel.ZIndex = 1
-            claimPanel.ZIndex = 1
-            tutorialPanel.ZIndex = 1
-        elseif tabName == "BuySeed" then
-            buySeedPanel.ZIndex = 2
-            giftPanel.ZIndex = 1
-            buyGearPanel.ZIndex = 1
-            claimPanel.ZIndex = 1
-            tutorialPanel.ZIndex = 1
-        elseif tabName == "BuyGear" then
-            buyGearPanel.ZIndex = 2
-            giftPanel.ZIndex = 1
-            buySeedPanel.ZIndex = 1
-            claimPanel.ZIndex = 1
-            tutorialPanel.ZIndex = 1
-        elseif tabName == "ClaimDrop" then
-            claimPanel.ZIndex = 2
-            giftPanel.ZIndex = 1
-            buySeedPanel.ZIndex = 1
-            buyGearPanel.ZIndex = 1
-            tutorialPanel.ZIndex = 1
-        elseif tabName == "SkipTutorial" then
-            tutorialPanel.ZIndex = 2
-            giftPanel.ZIndex = 1
-            buySeedPanel.ZIndex = 1
-            buyGearPanel.ZIndex = 1
-            claimPanel.ZIndex = 1
-        end
+        giftPanel.Visible = true
     end
     setActiveTab("GiftMail")
 
@@ -1250,7 +1122,7 @@ local function createMailGui()
 
     local itemList = Instance.new("ScrollingFrame")
     itemList.Name = "ItemList"
-    itemList.Size = UDim2.new(1, 0, 1, -180)
+    itemList.Size = UDim2.new(1, 0, 1, -170)
     itemList.Position = UDim2.new(0, 0, 0, 44)
     itemList.BackgroundColor3 = Color3.fromRGB(38, 38, 38)
     itemList.BorderSizePixel = 0
@@ -1264,15 +1136,15 @@ local function createMailGui()
 
     local mailControlsFrame = Instance.new("Frame")
     mailControlsFrame.Name = "MailControls"
-    mailControlsFrame.Size = UDim2.new(1, 0, 0, 126)
-    mailControlsFrame.Position = UDim2.new(0, 0, 1, -126)
+    mailControlsFrame.Size = UDim2.new(1, 0, 0, 136)
+    mailControlsFrame.Position = UDim2.new(0, 0, 1, -136)
     mailControlsFrame.BackgroundTransparency = 1
     mailControlsFrame.Parent = giftPanel
 
     local usernameBox = Instance.new("TextBox")
     usernameBox.Name = "UsernameBox"
     usernameBox.PlaceholderText = "Recipient Username"
-    usernameBox.Size = UDim2.new(0.58, 0, 0, 28)
+    usernameBox.Size = UDim2.new(0.56, 0, 0, 26)
     usernameBox.Position = UDim2.new(0, 0, 0, 0)
     usernameBox.BackgroundColor3 = Color3.fromRGB(52, 52, 58)
     usernameBox.TextColor3 = Color3.fromRGB(240, 240, 240)
@@ -1283,8 +1155,8 @@ local function createMailGui()
     local quantityBox = Instance.new("TextBox")
     quantityBox.Name = "QuantityBox"
     quantityBox.PlaceholderText = "Qty to send"
-    quantityBox.Size = UDim2.new(0.28, 0, 0, 28)
-    quantityBox.Position = UDim2.new(0.60, 0, 0, 0)
+    quantityBox.Size = UDim2.new(0.24, 0, 0, 26)
+    quantityBox.Position = UDim2.new(0.58, 0, 0, 0)
     quantityBox.BackgroundColor3 = Color3.fromRGB(52, 52, 58)
     quantityBox.TextColor3 = Color3.fromRGB(240, 240, 240)
     quantityBox.Text = tostring(settings.AutoMail.itemcount)
@@ -1305,8 +1177,8 @@ local function createMailGui()
 
     local selectAllButton = Instance.new("TextButton")
     selectAllButton.Name = "SelectAll"
-    selectAllButton.Size = UDim2.new(0.22, 0, 0, 24)
-    selectAllButton.Position = UDim2.new(0, 0, 0, 64)
+    selectAllButton.Size = UDim2.new(0.23, 0, 0, 22)
+    selectAllButton.Position = UDim2.new(0, 0, 0, 62)
     selectAllButton.Text = "Select All"
     selectAllButton.BackgroundColor3 = Color3.fromRGB(70, 70, 80)
     selectAllButton.TextColor3 = Color3.fromRGB(245, 245, 245)
@@ -1317,8 +1189,8 @@ local function createMailGui()
 
     local clearButton = Instance.new("TextButton")
     clearButton.Name = "ClearSelection"
-    clearButton.Size = UDim2.new(0.22, 0, 0, 24)
-    clearButton.Position = UDim2.new(0.24, 0, 0, 64)
+    clearButton.Size = UDim2.new(0.23, 0, 0, 22)
+    clearButton.Position = UDim2.new(0.25, 0, 0, 62)
     clearButton.Text = "Clear"
     clearButton.BackgroundColor3 = Color3.fromRGB(70, 70, 80)
     clearButton.TextColor3 = Color3.fromRGB(245, 245, 245)
@@ -1329,8 +1201,8 @@ local function createMailGui()
 
     local syncButton = Instance.new("TextButton")
     syncButton.Name = "SyncButton"
-    syncButton.Size = UDim2.new(0.22, 0, 0, 24)
-    syncButton.Position = UDim2.new(0.48, 0, 0, 64)
+    syncButton.Size = UDim2.new(0.23, 0, 0, 22)
+    syncButton.Position = UDim2.new(0.50, 0, 0, 62)
     syncButton.Text = "Sync Inventory"
     syncButton.BackgroundColor3 = Color3.fromRGB(70, 70, 90)
     syncButton.TextColor3 = Color3.fromRGB(240, 240, 240)
@@ -1341,8 +1213,8 @@ local function createMailGui()
 
     local sendButton = Instance.new("TextButton")
     sendButton.Name = "SendButton"
-    sendButton.Size = UDim2.new(0.22, 0, 0, 24)
-    sendButton.Position = UDim2.new(0.72, 0, 0, 64)
+    sendButton.Size = UDim2.new(0.23, 0, 0, 22)
+    sendButton.Position = UDim2.new(0.75, 0, 0, 62)
     sendButton.Text = "Send Mail"
     sendButton.BackgroundColor3 = Color3.fromRGB(75, 125, 180)
     sendButton.TextColor3 = Color3.fromRGB(245, 245, 245)
@@ -1353,8 +1225,8 @@ local function createMailGui()
 
     local autoButton = Instance.new("TextButton")
     autoButton.Name = "AutoGiftButton"
-    autoButton.Size = UDim2.new(0.22, 0, 0, 24)
-    autoButton.Position = UDim2.new(0.96, -8, 0, 64)
+    autoButton.Size = UDim2.new(0.23, 0, 0, 22)
+    autoButton.Position = UDim2.new(0.25, 0, 0, 92)
     autoButton.Text = "Auto Gift OFF"
     autoButton.BackgroundColor3 = Color3.fromRGB(175, 80, 80)
     autoButton.TextColor3 = Color3.fromRGB(245, 245, 245)
@@ -1785,6 +1657,4 @@ return {
     SyncInventory = SyncInventory,
     settings = settings,
 }
-
-
 
