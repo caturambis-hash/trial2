@@ -400,7 +400,28 @@ local function findKnownItemName(label)
 end
 
 local function categorizeItem(name)
-    local lower = name:lower()
+    local input = normalizeText(name or "")
+    local lower = input:lower()
+
+    for _, entry in ipairs(SEED_DATABASE) do
+        local seedName = entry:lower()
+        if lower == seedName or lower:find(seedName, 1, true) then
+            return "Seeds"
+        end
+    end
+    for _, entry in ipairs(GEAR_DATABASE) do
+        local gearName = entry:lower()
+        if lower == gearName or lower:find(gearName, 1, true) then
+            return "Gear"
+        end
+    end
+    for _, entry in ipairs(PET_DATABASE) do
+        local petName = entry:lower()
+        if lower == petName or lower:find(petName, 1, true) then
+            return "Pets"
+        end
+    end
+
     local seedTerms = {
         "seed", "sapling", "sprout", "plant", "berry", "bean", "melon", "pumpkin", "carrot",
         "potato", "corn", "wheat", "flower", "leaf", "grass", "tree", "root", "vine",
@@ -412,7 +433,7 @@ local function categorizeItem(name)
     local gearTerms = {
         "watering", "shovel", "fertilizer", "harvester", "auto", "can", "hoe", "bucket",
         "sprayer", "net", "glove", "scissors", "tractor", "cart", "hammer", "crate", "tool",
-        "sprinkler", "sign", "trowel", "lantern", "megaphone", "mushroom", "pot", "teleporter",
+        "sprinkler", "sign", "trowel", "lantern", "megaphone", "pot", "teleporter",
         "wheelbarrow", "sniper", "magnet"
     }
     local petTerms = {
@@ -449,6 +470,7 @@ local autoLoopRunning = false
 local scriptActive = true
 local autoBuySeedTargets = {}
 local autoBuyGearTargets = {}
+local mainUiVisible = true
 
 local function safeGetAttribute(instance, key)
     if not instance or not instance.GetAttribute then
@@ -746,6 +768,19 @@ local function findBuyButtonForItem(itemName, categoryHint)
     end
     local query = normalizeText(itemName):lower()
     local category = normalizeText(categoryHint or ""):lower()
+    local variants = {query}
+    if category ~= "" then
+        table.insert(variants, category)
+        table.insert(variants, category .. " " .. query)
+        table.insert(variants, query .. " " .. category)
+    end
+    if query:find(" ", 1, true) then
+        local simple = query:gsub("%s+", "")
+        if simple ~= query then
+            table.insert(variants, simple)
+        end
+    end
+
     local bestButton = nil
     local bestScore = -1
     local buttons = {}
@@ -772,8 +807,14 @@ local function findBuyButtonForItem(itemName, categoryHint)
             ancestor = ancestor.Parent
         end
         local score = 0
-        local containsItem = text:find(query, 1, true) or name:find(query, 1, true) or parentText:find(query, 1, true) or ancestorText:find(query, 1, true)
-        if containsItem then
+        local hasMatch = false
+        for _, variant in ipairs(variants) do
+            if variant ~= "" and (text:find(variant, 1, true) or name:find(variant, 1, true) or parentText:find(variant, 1, true) or ancestorText:find(variant, 1, true)) then
+                hasMatch = true
+                break
+            end
+        end
+        if hasMatch then
             score = score + 8
         end
         if text:find("buy", 1, true) or text:find("purchase", 1, true) or text:find("shop", 1, true)
@@ -791,8 +832,8 @@ local function findBuyButtonForItem(itemName, categoryHint)
         if category ~= "" and (text:find(category, 1, true) or parentText:find(category, 1, true) or ancestorText:find(category, 1, true)) then
             score = score + 2
         end
-        if containsItem and (text:find("buy", 1, true) or parentText:find("buy", 1, true) or ancestorText:find("buy", 1, true)) then
-            score = score + 4
+        if hasMatch and (text:find("buy", 1, true) or parentText:find("buy", 1, true) or ancestorText:find("buy", 1, true)) then
+            score = score + 3
         end
         if isBlockedText(text) or isBlockedText(parentText) or isBlockedText(ancestorText) then
             score = score - 120
@@ -803,10 +844,50 @@ local function findBuyButtonForItem(itemName, categoryHint)
         end
     end
 
-    if bestButton and bestScore >= 10 then
+    if bestButton and bestScore >= 6 then
         return bestButton
     end
     return nil
+end
+
+local function tryClickPurchaseTarget(itemName, categoryHint)
+    local button = findBuyButtonForItem(itemName, categoryHint)
+    local targets = {}
+    if button then
+        table.insert(targets, button)
+    end
+    if button and button.Parent then
+        local parent = button.Parent
+        for _ = 1, 6 do
+            if parent and (parent:IsA("GuiButton") or parent:IsA("ImageButton")) then
+                table.insert(targets, parent)
+            end
+            if not parent then
+                break
+            end
+            parent = parent.Parent
+        end
+    end
+    for _, target in ipairs(targets) do
+        if fireGuiButton(target) then
+            return true
+        end
+    end
+
+    for _, obj in ipairs(PlayerGui:GetDescendants()) do
+        if (obj:IsA("GuiButton") or obj:IsA("ImageButton")) and obj.Visible and obj.Active and not isOwnGui(obj) then
+            local text = collectGuiText(obj):lower()
+            if text:find("buy", 1, true) or text:find("purchase", 1, true) or text:find("shop", 1, true) then
+                if text:find("seed", 1, true) or text:find("gear", 1, true) or text:find("sprinkler", 1, true) or text:find("watering", 1, true) or text:find("mushroom", 1, true) then
+                    if fireGuiButton(obj) then
+                        return true
+                    end
+                end
+            end
+        end
+    end
+
+    return false
 end
 
 local function autoBuySeedOrGear()
@@ -835,13 +916,9 @@ local function autoBuySeedOrGear()
         return false
     end
     for _, candidate in ipairs(candidates) do
-        local button = findBuyButtonForItem(candidate.Name, candidate.Category)
-        if button then
-            local success = fireGuiButton(button)
-            if success then
-                autoBuyCooldownUntil = os.clock() + AUTO_BUY_COOLDOWN
-                return true, candidate.Name
-            end
+        if tryClickPurchaseTarget(candidate.Name, candidate.Category) then
+            autoBuyCooldownUntil = os.clock() + AUTO_BUY_COOLDOWN
+            return true, candidate.Name
         end
     end
     return false
@@ -916,42 +993,68 @@ local function createMailGui()
     toggleScreen.ResetOnSpawn = false
     toggleScreen.Parent = PlayerGui
 
-    local toggleButton = Instance.new("TextButton")
-    toggleButton.Name = "ToggleScriptButton"
-    toggleButton.Size = UDim2.new(0, 160, 0, 34)
-    toggleButton.Position = UDim2.new(0.5, -80, 0.02, 0)
-    toggleButton.BackgroundColor3 = Color3.fromRGB(90, 150, 90)
-    toggleButton.TextColor3 = Color3.fromRGB(245, 245, 245)
-    toggleButton.Font = Enum.Font.GothamBold
-    toggleButton.TextSize = 12
-    toggleButton.Text = "Close Script"
-    toggleButton.Parent = toggleScreen
-    Instance.new("UICorner", toggleButton).CornerRadius = UDim.new(0, 8)
-
-    local function setScriptUiVisible(visible)
-        screen.Enabled = visible
-        toggleButton.Text = visible and "Close Script" or "Open Script"
-        toggleButton.BackgroundColor3 = visible and Color3.fromRGB(175, 80, 80) or Color3.fromRGB(90, 150, 90)
+    local frame = nil
+    local autoEnabled = false
+    local autoRunning = false
+    local function updateAutoButton()
+        if autoButton then
+            autoButton.Text = autoEnabled and "Auto Gift ON" or "Auto Gift OFF"
+            autoButton.BackgroundColor3 = autoEnabled and Color3.fromRGB(90, 150, 90) or Color3.fromRGB(175, 80, 80)
+        end
     end
 
-    toggleButton.Activated:Connect(function()
+    local hideUiButton = Instance.new("TextButton")
+    hideUiButton.Name = "HideUiButton"
+    hideUiButton.Size = UDim2.new(0, 110, 0, 28)
+    hideUiButton.Position = UDim2.new(0.5, -125, 0.02, 0)
+    hideUiButton.BackgroundColor3 = Color3.fromRGB(70, 120, 180)
+    hideUiButton.TextColor3 = Color3.fromRGB(245, 245, 245)
+    hideUiButton.Font = Enum.Font.GothamBold
+    hideUiButton.TextSize = 11
+    hideUiButton.Text = "Hide UI"
+    hideUiButton.Parent = toggleScreen
+    Instance.new("UICorner", hideUiButton).CornerRadius = UDim.new(0, 8)
+
+    local scriptToggleButton = Instance.new("TextButton")
+    scriptToggleButton.Name = "ToggleScriptButton"
+    scriptToggleButton.Size = UDim2.new(0, 110, 0, 28)
+    scriptToggleButton.Position = UDim2.new(0.5, 0, 0.02, 0)
+    scriptToggleButton.BackgroundColor3 = Color3.fromRGB(175, 80, 80)
+    scriptToggleButton.TextColor3 = Color3.fromRGB(245, 245, 245)
+    scriptToggleButton.Font = Enum.Font.GothamBold
+    scriptToggleButton.TextSize = 11
+    scriptToggleButton.Text = "Close Script"
+    scriptToggleButton.Parent = toggleScreen
+    Instance.new("UICorner", scriptToggleButton).CornerRadius = UDim.new(0, 8)
+
+    hideUiButton.Activated:Connect(function()
+        mainUiVisible = not mainUiVisible
+        if frame then
+            frame.Visible = mainUiVisible
+        end
+        hideUiButton.Text = mainUiVisible and "Hide UI" or "Show UI"
+        hideUiButton.BackgroundColor3 = mainUiVisible and Color3.fromRGB(70, 120, 180) or Color3.fromRGB(92, 92, 102)
+    end)
+
+    scriptToggleButton.Activated:Connect(function()
         scriptActive = not scriptActive
-        setScriptUiVisible(scriptActive)
+        scriptToggleButton.Text = scriptActive and "Close Script" or "Open Script"
+        scriptToggleButton.BackgroundColor3 = scriptActive and Color3.fromRGB(175, 80, 80) or Color3.fromRGB(90, 150, 90)
         if not scriptActive then
             autoBuySeedsEnabled = false
             autoBuyGearsEnabled = false
             autoClaimSeedDropEnabled = false
             autoSkipTutorialEnabled = false
+            autoEnabled = false
+            updateAutoButton()
         end
         startAutomationLoop()
     end)
 
-    setScriptUiVisible(true)
-
-    local frame = Instance.new("Frame")
+    frame = Instance.new("Frame")
     frame.Name = "MainFrame"
-    frame.Size = UDim2.new(0, 640, 0, 400)
-    frame.Position = UDim2.new(0.5, -320, 0.08, 0)
+    frame.Size = UDim2.new(0, 520, 0, 320)
+    frame.Position = UDim2.new(0.5, -260, 0.08, 0)
     frame.BackgroundColor3 = Color3.fromRGB(24, 24, 28)
     frame.BorderSizePixel = 0
     frame.Active = true
@@ -965,13 +1068,13 @@ local function createMailGui()
     title.BackgroundTransparency = 1
     title.Text = "Grow A Garden 2 - Mail Exploiter"
     title.Font = Enum.Font.GothamBold
-    title.TextSize = 18
+    title.TextSize = 15
     title.TextColor3 = Color3.fromRGB(235, 235, 235)
     title.Parent = frame
 
     local sidebar = Instance.new("Frame")
     sidebar.Name = "Sidebar"
-    sidebar.Size = UDim2.new(0, 140, 1, -40)
+    sidebar.Size = UDim2.new(0, 122, 1, -40)
     sidebar.Position = UDim2.new(0, 10, 0, 40)
     sidebar.BackgroundColor3 = Color3.fromRGB(34, 34, 38)
     sidebar.BorderSizePixel = 0
@@ -996,7 +1099,7 @@ local function createMailGui()
     local function createTabButton(label, tabName)
         local btn = Instance.new("TextButton")
         btn.Name = tabName
-        btn.Size = UDim2.new(1, -12, 0, 34)
+        btn.Size = UDim2.new(1, -12, 0, 30)
         btn.BackgroundColor3 = Color3.fromRGB(50, 50, 56)
         btn.TextColor3 = Color3.fromRGB(240, 240, 240)
         btn.Text = label
@@ -1121,8 +1224,8 @@ local function createMailGui()
     for index, name in ipairs(categoryNames) do
         local btn = Instance.new("TextButton")
         btn.Name = name
-        btn.Size = UDim2.new(0, 82, 0, 30)
-        btn.Position = UDim2.new(0, (index - 1) * 86, 0, 0)
+        btn.Size = UDim2.new(0, 74, 0, 28)
+        btn.Position = UDim2.new(0, (index - 1) * 78, 0, 0)
         btn.BackgroundColor3 = Color3.fromRGB(42, 42, 48)
         btn.TextColor3 = Color3.fromRGB(220, 220, 220)
         btn.Text = name
@@ -1147,7 +1250,7 @@ local function createMailGui()
 
     local itemList = Instance.new("ScrollingFrame")
     itemList.Name = "ItemList"
-    itemList.Size = UDim2.new(1, 0, 1, -190)
+    itemList.Size = UDim2.new(1, 0, 1, -180)
     itemList.Position = UDim2.new(0, 0, 0, 44)
     itemList.BackgroundColor3 = Color3.fromRGB(38, 38, 38)
     itemList.BorderSizePixel = 0
@@ -1161,15 +1264,15 @@ local function createMailGui()
 
     local mailControlsFrame = Instance.new("Frame")
     mailControlsFrame.Name = "MailControls"
-    mailControlsFrame.Size = UDim2.new(1, 0, 0, 140)
-    mailControlsFrame.Position = UDim2.new(0, 0, 1, -140)
+    mailControlsFrame.Size = UDim2.new(1, 0, 0, 126)
+    mailControlsFrame.Position = UDim2.new(0, 0, 1, -126)
     mailControlsFrame.BackgroundTransparency = 1
     mailControlsFrame.Parent = giftPanel
 
     local usernameBox = Instance.new("TextBox")
     usernameBox.Name = "UsernameBox"
     usernameBox.PlaceholderText = "Recipient Username"
-    usernameBox.Size = UDim2.new(0.58, 0, 0, 32)
+    usernameBox.Size = UDim2.new(0.58, 0, 0, 28)
     usernameBox.Position = UDim2.new(0, 0, 0, 0)
     usernameBox.BackgroundColor3 = Color3.fromRGB(52, 52, 58)
     usernameBox.TextColor3 = Color3.fromRGB(240, 240, 240)
@@ -1180,7 +1283,7 @@ local function createMailGui()
     local quantityBox = Instance.new("TextBox")
     quantityBox.Name = "QuantityBox"
     quantityBox.PlaceholderText = "Qty to send"
-    quantityBox.Size = UDim2.new(0.28, 0, 0, 32)
+    quantityBox.Size = UDim2.new(0.28, 0, 0, 28)
     quantityBox.Position = UDim2.new(0.60, 0, 0, 0)
     quantityBox.BackgroundColor3 = Color3.fromRGB(52, 52, 58)
     quantityBox.TextColor3 = Color3.fromRGB(240, 240, 240)
@@ -1190,20 +1293,20 @@ local function createMailGui()
 
     local statusLabel = Instance.new("TextLabel")
     statusLabel.Name = "StatusLabel"
-    statusLabel.Size = UDim2.new(1, 0, 0, 22)
-    statusLabel.Position = UDim2.new(0, 0, 0, 42)
+    statusLabel.Size = UDim2.new(1, 0, 0, 20)
+    statusLabel.Position = UDim2.new(0, 0, 0, 38)
     statusLabel.BackgroundTransparency = 1
     statusLabel.Text = "Ready"
     statusLabel.TextColor3 = Color3.fromRGB(215, 215, 215)
     statusLabel.Font = Enum.Font.Gotham
-    statusLabel.TextSize = 12
+    statusLabel.TextSize = 10
     statusLabel.TextXAlignment = Enum.TextXAlignment.Left
     statusLabel.Parent = mailControlsFrame
 
     local selectAllButton = Instance.new("TextButton")
     selectAllButton.Name = "SelectAll"
-    selectAllButton.Size = UDim2.new(0.22, 0, 0, 28)
-    selectAllButton.Position = UDim2.new(0, 0, 0, 72)
+    selectAllButton.Size = UDim2.new(0.22, 0, 0, 24)
+    selectAllButton.Position = UDim2.new(0, 0, 0, 64)
     selectAllButton.Text = "Select All"
     selectAllButton.BackgroundColor3 = Color3.fromRGB(70, 70, 80)
     selectAllButton.TextColor3 = Color3.fromRGB(245, 245, 245)
@@ -1214,8 +1317,8 @@ local function createMailGui()
 
     local clearButton = Instance.new("TextButton")
     clearButton.Name = "ClearSelection"
-    clearButton.Size = UDim2.new(0.22, 0, 0, 28)
-    clearButton.Position = UDim2.new(0.24, 0, 0, 72)
+    clearButton.Size = UDim2.new(0.22, 0, 0, 24)
+    clearButton.Position = UDim2.new(0.24, 0, 0, 64)
     clearButton.Text = "Clear"
     clearButton.BackgroundColor3 = Color3.fromRGB(70, 70, 80)
     clearButton.TextColor3 = Color3.fromRGB(245, 245, 245)
@@ -1226,8 +1329,8 @@ local function createMailGui()
 
     local syncButton = Instance.new("TextButton")
     syncButton.Name = "SyncButton"
-    syncButton.Size = UDim2.new(0.22, 0, 0, 28)
-    syncButton.Position = UDim2.new(0.48, 0, 0, 72)
+    syncButton.Size = UDim2.new(0.22, 0, 0, 24)
+    syncButton.Position = UDim2.new(0.48, 0, 0, 64)
     syncButton.Text = "Sync Inventory"
     syncButton.BackgroundColor3 = Color3.fromRGB(70, 70, 90)
     syncButton.TextColor3 = Color3.fromRGB(240, 240, 240)
@@ -1238,8 +1341,8 @@ local function createMailGui()
 
     local sendButton = Instance.new("TextButton")
     sendButton.Name = "SendButton"
-    sendButton.Size = UDim2.new(0.22, 0, 0, 28)
-    sendButton.Position = UDim2.new(0.72, 0, 0, 72)
+    sendButton.Size = UDim2.new(0.22, 0, 0, 24)
+    sendButton.Position = UDim2.new(0.72, 0, 0, 64)
     sendButton.Text = "Send Mail"
     sendButton.BackgroundColor3 = Color3.fromRGB(75, 125, 180)
     sendButton.TextColor3 = Color3.fromRGB(245, 245, 245)
@@ -1250,8 +1353,8 @@ local function createMailGui()
 
     local autoButton = Instance.new("TextButton")
     autoButton.Name = "AutoGiftButton"
-    autoButton.Size = UDim2.new(0.22, 0, 0, 28)
-    autoButton.Position = UDim2.new(0.96, -8, 0, 72)
+    autoButton.Size = UDim2.new(0.22, 0, 0, 24)
+    autoButton.Position = UDim2.new(0.96, -8, 0, 64)
     autoButton.Text = "Auto Gift OFF"
     autoButton.BackgroundColor3 = Color3.fromRGB(175, 80, 80)
     autoButton.TextColor3 = Color3.fromRGB(245, 245, 245)
@@ -1278,10 +1381,10 @@ local function createMailGui()
     end
 
     local function addItemButton(itemName, qty, itemKey, inventoryCategory)
-        local category = categorizeItem(itemName)
+        local category = mapInventoryCategoryToUiCategory(inventoryCategory) or categorizeItem(itemName)
         local btn = Instance.new("TextButton")
         btn.Name = itemName:gsub("%s+", "_")
-        btn.Size = UDim2.new(1, 0, 0, 30)
+        btn.Size = UDim2.new(1, 0, 0, 26)
         btn.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
         btn.TextColor3 = Color3.fromRGB(235, 235, 235)
         btn.Font = Enum.Font.Gotham
@@ -1403,12 +1506,6 @@ local function createMailGui()
         return true
     end
 
-    local autoEnabled = false
-    local autoRunning = false
-    local function updateAutoButton()
-        autoButton.Text = autoEnabled and "Auto Gift ON" or "Auto Gift OFF"
-        autoButton.BackgroundColor3 = autoEnabled and Color3.fromRGB(90, 150, 90) or Color3.fromRGB(175, 80, 80)
-    end
     local function getSelectedSummary()
         local items = getSelectedItems()
         local total = 0
@@ -1418,15 +1515,15 @@ local function createMailGui()
         return items, total
     end
     local function autoGiftLoop()
-        if autoRunning then
+        if autoRunning or not scriptActive then
             return
         end
         autoRunning = true
-        spawn(function()
-            while autoEnabled do
-                local recipient = usernameBox.Text
+        task.spawn(function()
+            while autoEnabled and scriptActive do
+                local recipient = normalizeUsername(usernameBox.Text)
                 local targetQty = tonumber(quantityBox.Text) or 1
-                local items, totalQty = getSelectedSummary()
+                local _, totalQty = getSelectedSummary()
                 if recipient == "" then
                     setStatus("Auto Gift berhenti: username kosong")
                     autoEnabled = false
@@ -1434,20 +1531,17 @@ local function createMailGui()
                     break
                 end
                 if totalQty <= 0 then
-                    setStatus("Auto Gift berhenti: tidak ada item terpilih")
-                    autoEnabled = false
-                    updateAutoButton()
-                    break
+                    setStatus("Auto Gift menunggu item terpilih...")
+                    task.wait(1.2)
+                else
+                    local sendQty = math.min(targetQty, totalQty)
+                    setStatus("Auto Gift kirim " .. tostring(sendQty) .. " item ke " .. recipient)
+                    local ok = sendByMail(recipient, sendQty)
+                    if not ok then
+                        setStatus("Auto Gift gagal, menunggu ulang...")
+                    end
+                    task.wait(2.5)
                 end
-                local sendQty = math.min(targetQty, totalQty)
-                setStatus("Auto Gift kirim " .. tostring(sendQty) .. " item ke " .. recipient)
-                if not sendByMail(recipient, sendQty) then
-                    setStatus("Auto Gift gagal")
-                    autoEnabled = false
-                    updateAutoButton()
-                    break
-                end
-                task.wait(3)
             end
             autoRunning = false
         end)
@@ -1691,3 +1785,6 @@ return {
     SyncInventory = SyncInventory,
     settings = settings,
 }
+
+
+
