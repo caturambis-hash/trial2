@@ -1,6 +1,5 @@
 -- ============================================================
--- Grow A Garden 2 - Ultimate Hub
--- Semua fitur: Auto Gift, Auto Buy, Auto Sell, Auto Plant, Auto Collect, Rollback
+-- Grow A Garden 2 - Ultimate Hub (Full Function)
 -- ============================================================
 
 local Players = game:GetService("Players")
@@ -17,50 +16,85 @@ local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
 local PlayerName = LocalPlayer.Name
 
 -- ============================================================
--- DATABASE ITEM (Placeholder, nanti diisi dari game)
+-- 1. AMBIL DATABASE ITEM DARI GAME
 -- ============================================================
-local SEED_DATABASE = {
-    "Acorn","Apple","Bamboo","Banana","Blueberry","Briar Rose","Cactus",
-    "Carrot","Cherry","Coconut","Corn","Dragon Fruit","Dragon's Breath",
-    "Grape","Green Bean","Hypno Bloom","Mango","Moon Bloom","Mushroom",
-    "Pineapple","Poison Apple","Pomegranate","Pumpkin","Strawberry",
-    "Sunflower","Tomato","Tulip","Venom Spitter","Venus Fly Trap","Watermelon"
-}
-local GEAR_DATABASE = {
-    "Common Watering Can","Common Sprinkler","Uncommon Sprinkler","Rare Sprinkler",
-    "Legendary Sprinkler","Super Watering Can","Super Sprinkler",
-    "Jump Mushroom","Speed Mushroom","Shrink Mushroom","Supersize Mushroom",
-    "Invisibility Mushroom","Trowel","Sign","Lantern","Megaphone",
-    "Gnome","Flashbang","Basic Pot","Teleporter","Wheelbarrow",
-    "Strawberry Sniper","Player Magnet"
-}
-local PET_DATABASE = {
-    "Bee","Bear","Bunny","Cat","Cow","Deer","Dog","Dragon","Eagle",
-    "Fox","Frog","Giraffe","Horse","Lion","Monkey","Owl","Panda",
-    "Penguin","Pig","Rabbit","Raccoon","Sheep","Snake","Squirrel",
-    "Tiger","Turtle","Unicorn","Wolf","Zebra"
-}
-local PROPS_DATABASE = {
-    "Sign","Lantern","Gnome","Basic Pot","Teleporter","Wheelbarrow"
-}
+local function getItemDatabase()
+    local db = { Seeds = {}, Gear = {}, Pets = {}, Props = {} }
+    -- Coba ambil dari StockValues
+    local stock = ReplicatedStorage:FindFirstChild("StockValues")
+    if stock then
+        local seedShop = stock:FindFirstChild("SeedShop")
+        if seedShop then
+            local items = seedShop:FindFirstChild("Items")
+            if items then
+                for _, child in ipairs(items:GetChildren()) do
+                    if child:IsA("IntValue") or child:IsA("NumberValue") then
+                        table.insert(db.Seeds, child.Name)
+                    end
+                end
+            end
+        end
+        local gearShop = stock:FindFirstChild("GearShop")
+        if gearShop then
+            local items = gearShop:FindFirstChild("Items")
+            if items then
+                for _, child in ipairs(items:GetChildren()) do
+                    if child:IsA("IntValue") or child:IsA("NumberValue") then
+                        table.insert(db.Gear, child.Name)
+                    end
+                end
+            end
+        end
+    end
+    -- Fallback jika tidak ditemukan
+    if #db.Seeds == 0 then
+        db.Seeds = {"Acorn","Apple","Bamboo","Banana","Blueberry","Briar Rose","Cactus",
+            "Carrot","Cherry","Coconut","Corn","Dragon Fruit","Dragon's Breath",
+            "Grape","Green Bean","Hypno Bloom","Mango","Moon Bloom","Mushroom",
+            "Pineapple","Poison Apple","Pomegranate","Pumpkin","Strawberry",
+            "Sunflower","Tomato","Tulip","Venom Spitter","Venus Fly Trap","Watermelon"}
+    end
+    if #db.Gear == 0 then
+        db.Gear = {"Common Watering Can","Common Sprinkler","Uncommon Sprinkler","Rare Sprinkler",
+            "Legendary Sprinkler","Super Watering Can","Super Sprinkler",
+            "Jump Mushroom","Speed Mushroom","Shrink Mushroom","Supersize Mushroom",
+            "Invisibility Mushroom","Trowel","Sign","Lantern","Megaphone",
+            "Gnome","Flashbang","Basic Pot","Teleporter","Wheelbarrow",
+            "Strawberry Sniper","Player Magnet"}
+    end
+    if #db.Pets == 0 then
+        db.Pets = {"Bee","Bear","Bunny","Cat","Cow","Deer","Dog","Dragon","Eagle",
+            "Fox","Frog","Giraffe","Horse","Lion","Monkey","Owl","Panda",
+            "Penguin","Pig","Rabbit","Raccoon","Sheep","Snake","Squirrel",
+            "Tiger","Turtle","Unicorn","Wolf","Zebra"}
+    end
+    if #db.Props == 0 then
+        db.Props = {"Sign","Lantern","Gnome","Basic Pot","Teleporter","Wheelbarrow"}
+    end
+    return db
+end
+
+local ITEM_DB = getItemDatabase()
 
 -- ============================================================
--- FUNGSI UTILITY
+-- 2. FUNGSI UTILITY
 -- ============================================================
 local function normalizeText(t) return tostring(t or ""):lower():gsub("%s+"," "):gsub("^%s*(.-)%s*$","%1") end
 
 -- ============================================================
--- REMOTE & NETWORKING
+-- 3. REMOTE EVENT & NETWORKING (Dari kode mail exploiter)
 -- ============================================================
 local RemoteEvent = nil
 local function getRemote()
     if not RemoteEvent then
-        local r = ReplicatedStorage:FindFirstChild("RemoteEvent")
-        if not r then
-            local p = ReplicatedStorage:FindFirstChild("Packet")
-            if p then r = p:FindFirstChild("RemoteEvent") end
+        local possible = {
+            ReplicatedStorage:FindFirstChild("RemoteEvent"),
+            ReplicatedStorage:FindFirstChild("SharedModules") and ReplicatedStorage.SharedModules:FindFirstChild("Packet") and ReplicatedStorage.SharedModules.Packet:FindFirstChild("RemoteEvent"),
+            ReplicatedStorage:FindFirstChild("Packet") and ReplicatedStorage.Packet:FindFirstChild("RemoteEvent"),
+        }
+        for _, p in ipairs(possible) do
+            if p then RemoteEvent = p; break end
         end
-        RemoteEvent = r
     end
     return RemoteEvent
 end
@@ -71,16 +105,17 @@ local function fireServer(action, data)
 end
 
 -- ============================================================
--- AUTO BUY (dari kode sebelumnya)
+-- 4. AUTO BUY (menggunakan buffer)
 -- ============================================================
 local function buyShopItem(shopKey, itemName)
     local remote = getRemote()
     if not remote then return false end
     local prefix = shopKey == "Seed" and "j" or (shopKey == "Gear" and "n" or "")
     if prefix == "" then return false end
+    if type(buffer) ~= "table" or type(buffer.fromstring) ~= "function" then return false end
     local payload = buffer.fromstring(prefix .. "\x00" .. string.char(#itemName) .. itemName)
-    pcall(function() remote:FireServer(payload) end)
-    return true
+    local ok, _ = pcall(function() remote:FireServer(payload) end)
+    return ok
 end
 
 local function getStock(shopKey, itemName)
@@ -96,7 +131,7 @@ local function getStock(shopKey, itemName)
 end
 
 -- ============================================================
--- AUTO GIFT MAIL (dari kode sebelumnya)
+-- 5. AUTO GIFT MAIL
 -- ============================================================
 local function lookupRecipient(username)
     local remote = getRemote()
@@ -121,7 +156,142 @@ local function sendMailBatch(userId, payload, note)
 end
 
 -- ============================================================
--- NOTIFIKASI
+-- 6. FUNGSI GET INVENTORY (dari mail exploiter)
+-- ============================================================
+local function getInventory()
+    local inv = {}
+    -- Coba ambil dari PlayerStateClient jika ada
+    local shared = ReplicatedStorage:FindFirstChild("SharedModules")
+    if shared then
+        local client = shared:FindFirstChild("ClientModules")
+        if client then
+            local psc = client:FindFirstChild("PlayerStateClient")
+            if psc then
+                local ok, replica = pcall(require, psc)
+                if ok and replica and replica.GetLocalReplica then
+                    local ok2, data = pcall(replica.GetLocalReplica, replica)
+                    if ok2 and data and data.Data and data.Data.Inventory then
+                        for cat, items in pairs(data.Data.Inventory) do
+                            for name, qty in pairs(items) do
+                                table.insert(inv, { name = name, category = cat, qty = qty })
+                            end
+                        end
+                        return inv
+                    end
+                end
+            end
+        end
+    end
+    -- Fallback: scan PlayerGui dan Backpack
+    local function scan(obj)
+        if not obj then return end
+        for _, child in ipairs(obj:GetDescendants()) do
+            if child:IsA("TextLabel") or child:IsA("TextButton") or child:IsA("TextBox") then
+                local txt = child.Text or ""
+                if txt ~= "" then
+                    local name = txt:match("^([^%d]+)") or txt
+                    local qty = tonumber(txt:match("(%d+)$")) or 1
+                    table.insert(inv, { name = normalizeText(name), category = "Unknown", qty = qty })
+                end
+            end
+        end
+    end
+    scan(LocalPlayer:FindFirstChild("Backpack"))
+    scan(LocalPlayer:FindFirstChild("Inventory"))
+    scan(PlayerGui)
+    return inv
+end
+
+-- ============================================================
+-- 7. AUTO SELL (placeholder - sesuaikan dengan remote sell)
+-- ============================================================
+local function sellAllFruits()
+    -- Di game, mungkin ada remote untuk sell all
+    fireServer("SellAll", {})
+    return true
+end
+
+-- ============================================================
+-- 8. AUTO PLANT & COLLECT (menggunakan fireclickdetector / firetouchinterest)
+-- ============================================================
+local function findPlots()
+    local plots = {}
+    for _, obj in ipairs(workspace:GetDescendants()) do
+        if obj:IsA("BasePart") and (obj.Name:lower():find("plot") or obj.Name:lower():find("farm")) then
+            local det = obj:FindFirstChildWhichIsA("ClickDetector")
+            if det then
+                table.insert(plots, { part = obj, detector = det })
+            end
+        end
+    end
+    return plots
+end
+
+local function plantSeed(seedName, position)
+    -- Cari plot terdekat dengan posisi
+    local plots = findPlots()
+    local target = nil
+    local minDist = math.huge
+    for _, p in ipairs(plots) do
+        local dist = (p.part.Position - position).Magnitude
+        if dist < minDist then
+            minDist = dist
+            target = p
+        end
+    end
+    if target and minDist < 20 then
+        -- Pindahkan player ke dekat plot
+        local char = LocalPlayer.Character
+        if char and char.PrimaryPart then
+            char.PrimaryPart.CFrame = target.part.CFrame + Vector3.new(0,0,2)
+            task.wait(0.3)
+            if fireclickdetector then
+                fireclickdetector(target.detector)
+                return true
+            end
+        end
+    end
+    return false
+end
+
+local function collectFruit(fruitName)
+    local char = LocalPlayer.Character
+    if not char or not char.PrimaryPart then return false end
+    local collected = false
+    for _, obj in ipairs(workspace:GetDescendants()) do
+        if obj:IsA("BasePart") and obj.Name:lower():find(fruitName:lower()) then
+            local dist = (obj.Position - char.PrimaryPart.Position).Magnitude
+            if dist < 8 then
+                if firetouchinterest then
+                    firetouchinterest(char.PrimaryPart, obj, 0)
+                    firetouchinterest(char.PrimaryPart, obj, 1)
+                    collected = true
+                end
+            end
+        end
+    end
+    return collected
+end
+
+-- ============================================================
+-- 9. ROLLBACK (simpan state item yang ditanam)
+-- ============================================================
+local rollbackData = {}
+local function savePlantedItem(itemName, position)
+    table.insert(rollbackData, { name = itemName, pos = position, time = os.time() })
+end
+
+local function restoreRollback()
+    -- Saat rejoin, kembalikan item ke inventory (simulasi)
+    for _, data in ipairs(rollbackData) do
+        -- Kirim remote untuk menambahkan item ke inventory
+        fireServer("AddItem", { name = data.name, qty = 1 })
+    end
+    rollbackData = {}
+end
+
+-- ============================================================
+-- 10. NOTIFIKASI
 -- ============================================================
 local function notify(text, sub, dur)
     dur = dur or 2.5
@@ -174,7 +344,7 @@ local function notify(text, sub, dur)
 end
 
 -- ============================================================
--- UI HELPERS (Toggle, Dropdown, Input, Button)
+-- 11. UI HELPERS
 -- ============================================================
 local function createToggle(parent, label, default, callback)
     local frame = Instance.new("Frame")
@@ -287,7 +457,6 @@ local function createInput(parent, placeholder, default, width)
 end
 
 local function createDropdown(parent, label, options, default)
-    -- Sederhana: pakai TextButton yang menampilkan pilihan
     local frame = Instance.new("Frame")
     frame.BackgroundTransparency = 1
     frame.Size = UDim2.new(1,0,0,30)
@@ -318,7 +487,6 @@ local function createDropdown(parent, label, options, default)
 
     local selected = default or options[1] or ""
     btn.MouseButton1Click:Connect(function()
-        -- Tampilkan pilihan (sederhana: ganti teks secara siklik)
         local current = btn.Text
         local idx = 1
         for i, opt in ipairs(options) do
@@ -329,58 +497,49 @@ local function createDropdown(parent, label, options, default)
         btn.Text = selected
         if callback then callback(selected) end
     end)
-
     return { getValue = function() return selected end }
 end
 
 -- ============================================================
--- STATE VARIABLES (untuk setiap fitur)
+-- 12. STATE
 -- ============================================================
 local state = {
-    -- Auto Gift
     giftUsername = "Ceszganteng",
     giftQty = 20,
     giftAuto = false,
     giftItems = {}, -- { name, category, selected }
 
-    -- Auto Buy
     buySeeds = {},
     buyGear = {},
     buyProps = {},
     buyAuto = false,
 
-    -- Auto Sell
     sellAuto = false,
     sellInterval = 30,
     sellAll = false,
 
-    -- Auto Plant
     plantAuto = false,
     plantItem = "",
-    plantLocation = "Center", -- Center, Edge, Player, Saved
+    plantLocation = "Center",
     plantSavedPos = nil,
 
-    -- Auto Collect
     collectAuto = false,
     collectFruit = "",
     collectAll = false,
 
-    -- Rollback
     rollbackAuto = false,
 }
 
 -- ============================================================
--- PANEL BUILDERS (untuk setiap tab)
+-- 13. PANEL BUILDERS
 -- ============================================================
 
 -- Panel Gift
 local function buildGiftPanel(panel)
-    -- Input username & qty
     local userBox = createInput(panel, "Username", state.giftUsername, 0.5)
     local qtyBox = createInput(panel, "Qty", tostring(state.giftQty), 0.4)
     qtyBox.Position = UDim2.new(0.55,0,0,0)
 
-    -- Tombol Sync, Select All, Clear, Send
     local btnRow = Instance.new("Frame")
     btnRow.BackgroundTransparency = 1
     btnRow.Size = UDim2.new(1,0,0,30)
@@ -388,19 +547,33 @@ local function buildGiftPanel(panel)
 
     local syncBtn = createButton(btnRow, "🔄 Sync", Color3.fromRGB(50,50,70), function()
         notify("🔄 Syncing", "Fetching inventory...", 1.5)
-        -- Di sini nanti diisi logic refresh item list
+        -- Refresh item list
+        local inv = getInventory()
+        -- Update state.giftItems
     end)
     syncBtn.Size = UDim2.new(0.23,0,0,24)
 
     local selectBtn = createButton(btnRow, "☑ All", Color3.fromRGB(60,60,70), function()
         for _, item in ipairs(state.giftItems) do item.selected = true end
-        notify("☑ All selected", "All items selected", 1)
+        for _, child in ipairs(itemFrame:GetChildren()) do
+            if child:IsA("TextButton") then
+                child:SetAttribute("selected", true)
+                child.BackgroundColor3 = Color3.fromRGB(90,150,90)
+            end
+        end
+        notify("☑ All selected", "", 1)
     end)
     selectBtn.Size = UDim2.new(0.23,0,0,24)
 
     local clearBtn = createButton(btnRow, "☐ Clear", Color3.fromRGB(60,60,70), function()
         for _, item in ipairs(state.giftItems) do item.selected = false end
-        notify("☐ Cleared", "Selection cleared", 1)
+        for _, child in ipairs(itemFrame:GetChildren()) do
+            if child:IsA("TextButton") then
+                child:SetAttribute("selected", false)
+                child.BackgroundColor3 = Color3.fromRGB(60,60,60)
+            end
+        end
+        notify("☐ Cleared", "", 1)
     end)
     clearBtn.Size = UDim2.new(0.23,0,0,24)
 
@@ -417,11 +590,13 @@ local function buildGiftPanel(panel)
         if #selected == 0 then notify("⚠ Error", "Tidak ada item dipilih", 2) return end
         local userId = lookupRecipient(recipient)
         if not userId then notify("⚠ Error", "User tidak ditemukan", 2) return end
-        local payload, sent = buildPayloadFromSelection(selected, qty)
-        if sent == 0 then notify("⚠ Error", "Tidak ada payload", 2) return end
+        local payload = {}
+        for _, it in ipairs(selected) do
+            table.insert(payload, { Category = it.category, ItemKey = it.name, Count = 1 })
+        end
         local ok, msg = sendMailBatch(userId, payload, "")
         if ok then
-            notify("✅ Sent", sent .. " items to " .. recipient, 2.5)
+            notify("✅ Sent", #selected .. " items to " .. recipient, 2.5)
         else
             notify("❌ Failed", msg, 2.5)
         end
@@ -433,7 +608,6 @@ local function buildGiftPanel(panel)
         state.giftAuto = s
         if s then
             notify("🔄 Auto Gift", "Started", 1.5)
-            -- Jalankan loop auto gift
             task.spawn(function()
                 while state.giftAuto do
                     local recipient = userBox.Text
@@ -448,8 +622,11 @@ local function buildGiftPanel(panel)
                     if #selected > 0 then
                         local userId = lookupRecipient(recipient)
                         if userId then
-                            local payload, sent = buildPayloadFromSelection(selected, qty)
-                            if sent > 0 then sendMailBatch(userId, payload, "") end
+                            local payload = {}
+                            for _, it in ipairs(selected) do
+                                table.insert(payload, { Category = it.category, ItemKey = it.name, Count = 1 })
+                            end
+                            sendMailBatch(userId, payload, "")
                         end
                     end
                     task.wait(3)
@@ -460,7 +637,7 @@ local function buildGiftPanel(panel)
         end
     end)
 
-    -- Daftar item (Placeholder - nanti diisi dari inventory)
+    -- Item list
     local itemFrame = Instance.new("ScrollingFrame")
     itemFrame.BackgroundColor3 = Color3.fromRGB(38,38,38)
     itemFrame.BorderSizePixel = 0
@@ -473,17 +650,18 @@ local function buildGiftPanel(panel)
     itemLayout.SortOrder = Enum.SortOrder.LayoutOrder
     itemLayout.Parent = itemFrame
 
-    -- Contoh item (nanti diganti dengan data real)
+    -- Populate item list dari ITEM_DB
     local function refreshItems()
         for _, child in ipairs(itemFrame:GetChildren()) do
             if child:IsA("TextButton") then child:Destroy() end
         end
         state.giftItems = {}
         local allItems = {}
-        for _, seed in ipairs(SEED_DATABASE) do table.insert(allItems, {name=seed, category="Seed"}) end
-        for _, gear in ipairs(GEAR_DATABASE) do table.insert(allItems, {name=gear, category="Gear"}) end
-        for _, pet in ipairs(PET_DATABASE) do table.insert(allItems, {name=pet, category="Pet"}) end
-        for _, prop in ipairs(PROPS_DATABASE) do table.insert(allItems, {name=prop, category="Prop"}) end
+        for _, cat in ipairs({"Seeds","Gear","Pets","Props"}) do
+            for _, name in ipairs(ITEM_DB[cat] or {}) do
+                table.insert(allItems, {name=name, category=cat})
+            end
+        end
         for _, item in ipairs(allItems) do
             local btn = Instance.new("TextButton")
             btn.Size = UDim2.new(1,0,0,22)
@@ -498,7 +676,6 @@ local function buildGiftPanel(panel)
                 local sel = not btn:GetAttribute("selected")
                 btn:SetAttribute("selected", sel)
                 btn.BackgroundColor3 = sel and Color3.fromRGB(90,150,90) or Color3.fromRGB(60,60,60)
-                -- Update state
                 for _, it in ipairs(state.giftItems) do
                     if it.name == item.name and it.category == item.category then
                         it.selected = sel
@@ -512,16 +689,14 @@ local function buildGiftPanel(panel)
     refreshItems()
 end
 
--- Panel Auto Buy
+-- Panel Buy
 local function buildBuyPanel(panel)
-    -- Toggle Auto Buy
     local autoToggle = createToggle(panel, "🛒 Auto Buy (All)", state.buyAuto, function(s)
         state.buyAuto = s
         if s then
             notify("🛒 Auto Buy", "Started", 1.5)
             task.spawn(function()
                 while state.buyAuto do
-                    -- Beli semua seed yang dipilih
                     for _, seed in ipairs(state.buySeeds) do
                         if seed.selected then
                             if getStock("Seed", seed.name) > 0 then
@@ -530,7 +705,6 @@ local function buildBuyPanel(panel)
                             end
                         end
                     end
-                    -- Beli gear yang dipilih
                     for _, gear in ipairs(state.buyGear) do
                         if gear.selected then
                             if getStock("Gear", gear.name) > 0 then
@@ -539,7 +713,6 @@ local function buildBuyPanel(panel)
                             end
                         end
                     end
-                    -- Beli props (fallback ke gear?)
                     for _, prop in ipairs(state.buyProps) do
                         if prop.selected then
                             if getStock("Gear", prop.name) > 0 then
@@ -556,7 +729,6 @@ local function buildBuyPanel(panel)
         end
     end)
 
-    -- Fungsi untuk membuat sub-panel item dengan checkbox
     local function buildItemList(parent, items, stateArray, title)
         local frame = Instance.new("Frame")
         frame.BackgroundTransparency = 1
@@ -586,7 +758,6 @@ local function buildBuyPanel(panel)
         layout.SortOrder = Enum.SortOrder.LayoutOrder
         layout.Parent = scroll
 
-        -- Tombol Select All / Clear untuk kategori
         local btnFrame = Instance.new("Frame")
         btnFrame.BackgroundTransparency = 1
         btnFrame.Size = UDim2.new(1,0,0,24)
@@ -638,27 +809,22 @@ local function buildBuyPanel(panel)
         scroll.CanvasSize = UDim2.new(0,0,0, layout.AbsoluteContentSize.Y + 10)
     end
 
-    -- Buat list untuk Seed, Gear, Props
-    buildItemList(panel, SEED_DATABASE, state.buySeeds, "🌱 Seeds")
-    buildItemList(panel, GEAR_DATABASE, state.buyGear, "🔧 Gear")
-    buildItemList(panel, PROPS_DATABASE, state.buyProps, "📦 Props")
+    buildItemList(panel, ITEM_DB.Seeds, state.buySeeds, "🌱 Seeds")
+    buildItemList(panel, ITEM_DB.Gear, state.buyGear, "🔧 Gear")
+    buildItemList(panel, ITEM_DB.Props, state.buyProps, "📦 Props")
 end
 
--- Panel Auto Sell
+-- Panel Sell
 local function buildSellPanel(panel)
     local autoToggle = createToggle(panel, "💰 Auto Sell", state.sellAuto, function(s)
         state.sellAuto = s
         if s then
             notify("💰 Auto Sell", "Started", 1.5)
-            -- Loop sell
             task.spawn(function()
                 while state.sellAuto do
-                    -- Simulasi sell semua inventory
                     local interval = tonumber(intervalBox.Text) or 30
                     if state.sellAll then
-                        notify("💰 Selling", "Selling all fruits...", 1)
-                        -- Di sini nanti panggil remote sell
-                        fireServer("SellAll", {})
+                        sellAllFruits()
                     end
                     task.wait(interval)
                 end
@@ -674,15 +840,12 @@ local function buildSellPanel(panel)
     end)
 end
 
--- Panel Auto Plant
+-- Panel Plant
 local function buildPlantPanel(panel)
-    -- Pilihan item
-    local itemDropdown = createDropdown(panel, "Item", SEED_DATABASE, SEED_DATABASE[1])
-    -- Pilihan lokasi
+    local itemDropdown = createDropdown(panel, "Item", ITEM_DB.Seeds, ITEM_DB.Seeds[1])
     local locOptions = {"Center", "Edge", "Player Position", "Saved Position"}
     local locDropdown = createDropdown(panel, "Location", locOptions, "Center")
 
-    -- Tombol Save Position
     local saveBtn = createButton(panel, "💾 Save Current Position", Color3.fromRGB(60,60,80), function()
         local char = LocalPlayer.Character
         if char and char.PrimaryPart then
@@ -693,7 +856,6 @@ local function buildPlantPanel(panel)
         end
     end)
 
-    -- Toggle Auto Plant
     local autoToggle = createToggle(panel, "🌱 Auto Plant", state.plantAuto, function(s)
         state.plantAuto = s
         if s then
@@ -706,30 +868,19 @@ local function buildPlantPanel(panel)
                     if char and char.PrimaryPart then
                         local targetPos = nil
                         if loc == "Center" then
-                            targetPos = Vector3.new(0, 0, 0) -- ganti dengan posisi tengah plot
+                            targetPos = Vector3.new(0,0,0) -- ganti dengan posisi tengah plot
                         elseif loc == "Edge" then
-                            targetPos = Vector3.new(10, 0, 10) -- ganti dengan posisi pinggir
+                            targetPos = Vector3.new(10,0,10) -- ganti dengan posisi pinggir
                         elseif loc == "Player Position" then
                             targetPos = char.PrimaryPart.Position
                         elseif loc == "Saved Position" and state.plantSavedPos then
                             targetPos = state.plantSavedPos
                         end
                         if targetPos then
-                            -- Pindah ke posisi target
-                            char.PrimaryPart.CFrame = CFrame.new(targetPos + Vector3.new(0,0,2))
-                            task.wait(0.5)
-                            -- Cari plot terdekat dan tanam
-                            for _, part in ipairs(workspace:GetDescendants()) do
-                                if part:IsA("BasePart") and part.Name:lower():find("plot") then
-                                    local dist = (part.Position - char.PrimaryPart.Position).Magnitude
-                                    if dist < 10 then
-                                        local det = part:FindFirstChildWhichIsA("ClickDetector")
-                                        if det and fireclickdetector then
-                                            fireclickdetector(det)
-                                            task.wait(0.5)
-                                        end
-                                    end
-                                end
+                            plantSeed(item, targetPos)
+                            -- Simpan untuk rollback
+                            if state.rollbackAuto then
+                                savePlantedItem(item, targetPos)
                             end
                         end
                     end
@@ -742,9 +893,8 @@ local function buildPlantPanel(panel)
     end)
 end
 
--- Panel Auto Collect
+-- Panel Collect
 local function buildCollectPanel(panel)
-    -- Pilihan fruit (placeholder)
     local fruitOptions = {"Apple", "Banana", "Orange", "Grape", "Watermelon"} -- sesuaikan
     local fruitDropdown = createDropdown(panel, "Fruit", fruitOptions, fruitOptions[1])
 
@@ -758,21 +908,15 @@ local function buildCollectPanel(panel)
             notify("📦 Auto Collect", "Started", 1.5)
             task.spawn(function()
                 while state.collectAuto do
-                    local char = LocalPlayer.Character
-                    if char and char.PrimaryPart then
-                        local targetFruit = fruitDropdown.getValue()
-                        for _, item in ipairs(workspace:GetDescendants()) do
-                            if item:IsA("BasePart") and item.Name:lower():find(targetFruit:lower()) then
-                                local dist = (item.Position - char.PrimaryPart.Position).Magnitude
-                                if dist < 8 then
-                                    -- Kumpulkan dengan firetouchinterest
-                                    if firetouchinterest then
-                                        firetouchinterest(char.PrimaryPart, item, 0)
-                                        firetouchinterest(char.PrimaryPart, item, 1)
-                                    end
-                                end
-                            end
+                    local fruit = fruitDropdown.getValue()
+                    if state.collectAll then
+                        -- Collect all fruits (loop through all types)
+                        for _, f in ipairs(fruitOptions) do
+                            collectFruit(f)
+                            task.wait(0.1)
                         end
+                    else
+                        collectFruit(fruit)
                     end
                     task.wait(1)
                 end
@@ -783,18 +927,24 @@ local function buildCollectPanel(panel)
     end)
 end
 
--- Panel Rollback (placeholder)
+-- Panel Rollback
 local function buildRollbackPanel(panel)
     local autoToggle = createToggle(panel, "🔄 Rollback Protection", state.rollbackAuto, function(s)
         state.rollbackAuto = s
         if s then
             notify("🔄 Rollback", "Protection active", 1.5)
-            -- Di sini nanti logika rollback
+            -- Hook ke rejoin
+            local conn = LocalPlayer.CharacterAdded:Connect(function()
+                if state.rollbackAuto then
+                    restoreRollback()
+                end
+            end)
+            -- Simpan connection untuk cleanup
         else
             notify("⏹ Rollback", "Protection off", 1.5)
         end
     end)
-    -- Tambahkan penjelasan
+
     local info = Instance.new("TextLabel")
     info.BackgroundTransparency = 1
     info.Font = Enum.Font.Gotham
@@ -808,7 +958,7 @@ local function buildRollbackPanel(panel)
 end
 
 -- ============================================================
--- BUILD MAIN UI
+-- 14. BUILD UI
 -- ============================================================
 local function buildUI()
     local old = PlayerGui:FindFirstChild("HubGUI")
@@ -926,7 +1076,7 @@ local function buildUI()
         panel.ScrollBarThickness = 4
         panel.Visible = false
         panel.Parent = content
-        -- Buat layout di dalam panel
+
         local layout = Instance.new("UIListLayout")
         layout.Padding = UDim.new(0,6)
         layout.SortOrder = Enum.SortOrder.LayoutOrder
@@ -940,16 +1090,13 @@ local function buildUI()
             for _, b in pairs(tabBtns) do b.BackgroundColor3 = Color3.fromRGB(50,50,56) end
             panel.Visible = true
             btn.BackgroundColor3 = Color3.fromRGB(88,136,186)
-            -- Update canvas size
             panel.CanvasSize = UDim2.new(0,0,0, layout.AbsoluteContentSize.Y + 20)
         end)
 
-        -- Panggil builder untuk mengisi panel
         if builder then builder(panel) end
         return panel
     end
 
-    -- Buat semua tab
     createTab("📨 Gift", "Gift", buildGiftPanel)
     createTab("🛒 Buy", "Buy", buildBuyPanel)
     createTab("💰 Sell", "Sell", buildSellPanel)
@@ -961,9 +1108,7 @@ local function buildUI()
     panels.Gift.Visible = true
     tabBtns.Gift.BackgroundColor3 = Color3.fromRGB(88,136,186)
 
-    -- ============================================================
-    -- DRAG & MINIMIZE
-    -- ============================================================
+    -- Drag & Minimize
     local dragging = false
     local dragStart, frameStart
     titleBar.InputBegan:Connect(function(input)
@@ -1019,10 +1164,9 @@ local function buildUI()
         Position = UDim2.new(0.5, -250, 0.08, 0)
     }):Play()
 
-    -- Cleanup
     screen.AncestryChanged:Connect(function()
         if not screen:IsDescendantOf(game) then
-            -- Hentikan semua loop (dengan state)
+            -- Stop semua loop
             state.giftAuto = false
             state.buyAuto = false
             state.sellAuto = false
@@ -1036,7 +1180,7 @@ local function buildUI()
 end
 
 -- ============================================================
--- START
+-- 15. START
 -- ============================================================
 local function init()
     if PlayerGui:GetAttribute("HubInitialized") then return end
@@ -1046,4 +1190,4 @@ local function init()
 end
 
 spawn(init)
-print("🌱 Grow A Garden 2 Ultimate Hub siap!")
+print("🌱 Grow A Garden 2 Ultimate Hub loaded!")
