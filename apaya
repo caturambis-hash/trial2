@@ -1,5 +1,5 @@
 -- ============================================================
--- Grow A Garden 2 - Ultimate Hub (All Features)
+-- Grow A Garden 2 - Hub Sederhana (Semua Fitur Terisi)
 -- ============================================================
 
 local Players = game:GetService("Players")
@@ -16,387 +16,108 @@ local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
 local PlayerName = LocalPlayer.Name
 
 -- ============================================================
--- DATABASE ITEM (Dari repository gag2-shop/assets)
+-- DATABASE ITEM
 -- ============================================================
-
 local SEED_DATABASE = {
-    "Acorn", "Apple", "Bamboo", "Banana", "Blueberry", "Briar Rose", "Cactus",
-    "Carrot", "Cherry", "Coconut", "Corn", "Dragon Fruit", "Dragon's Breath",
-    "Grape", "Green Bean", "Hypno Bloom", "Mango", "Moon Bloom", "Mushroom",
-    "Pineapple", "Poison Apple", "Pomegranate", "Pumpkin", "Strawberry",
-    "Sunflower", "Tomato", "Tulip", "Venom Spitter", "Venus Fly Trap", "Watermelon"
+    "Acorn","Apple","Bamboo","Banana","Blueberry","Briar Rose","Cactus",
+    "Carrot","Cherry","Coconut","Corn","Dragon Fruit","Dragon's Breath",
+    "Grape","Green Bean","Hypno Bloom","Mango","Moon Bloom","Mushroom",
+    "Pineapple","Poison Apple","Pomegranate","Pumpkin","Strawberry",
+    "Sunflower","Tomato","Tulip","Venom Spitter","Venus Fly Trap","Watermelon"
 }
-
-local PET_DATABASE = {
-    "Bald Eagle", "Bear", "Bee", "Big Bee", "Black Dragon", "Bunny", "Butterfly",
-    "Capybara", "Cat", "Chicken", "Cow", "Deer", "Dog", "Dolphin", "Dragon",
-    "Duck", "Eagle", "Elephant", "Fish", "Flamingo", "Fox", "Frog", "Giraffe",
-    "Goat", "Goose", "Hamster", "Hedgehog", "Horse", "Kangaroo", "Koala",
-    "Lion", "Llama", "Monkey", "Moose", "Mouse", "Octopus", "Owl", "Panda",
-    "Parrot", "Peacock", "Penguin", "Pig", "Pigeon", "Polar Bear", "Pony",
-    "Rabbit", "Raccoon", "Rat", "Rhino", "Rooster", "Seahorse", "Sheep",
-    "Shrimp", "Skunk", "Sloth", "Snail", "Snake", "Spider", "Squirrel",
-    "Swan", "Tiger", "Toad", "Tortoise", "Turkey", "Turtle", "Unicorn",
-    "Walrus", "Whale", "Wolf", "Zebra"
-}
-
 local GEAR_DATABASE = {
-    "Common Watering Can", "Common Sprinkler", "Uncommon Sprinkler", "Rare Sprinkler",
-    "Legendary Sprinkler", "Super Watering Can", "Super Sprinkler",
-    "Jump Mushroom", "Speed Mushroom", "Shrink Mushroom", "Supersize Mushroom",
-    "Invisibility Mushroom", "Trowel", "Sign", "Lantern", "Megaphone",
-    "Gnome", "Flashbang", "Basic Pot", "Teleporter", "Wheelbarrow",
-    "Strawberry Sniper", "Player Magnet"
-}
-
--- Alias untuk pencarian (dari nama file aset)
-local SEED_ALIASES = {
-    ["Acorn"] = {"acorn"}, ["Apple"] = {"apple"}, ["Bamboo"] = {"bamboo"},
-    ["Banana"] = {"banana"}, ["Blueberry"] = {"blueberry"},
-    ["Briar Rose"] = {"briar-rose", "briarrose"}, ["Cactus"] = {"cactus"},
-    ["Carrot"] = {"carrot"}, ["Cherry"] = {"cherry"}, ["Coconut"] = {"coconut"},
-    ["Corn"] = {"corn"}, ["Dragon Fruit"] = {"dragon-fruit", "dragonfruit"},
-    ["Dragon's Breath"] = {"dragons-breath", "dragonsbreath"},
-    ["Grape"] = {"grape"}, ["Green Bean"] = {"green-bean", "greenbean"},
-    ["Hypno Bloom"] = {"hypno-bloom", "hypnobloom"}, ["Mango"] = {"mango"},
-    ["Moon Bloom"] = {"moon-bloom", "moonbloom"}, ["Mushroom"] = {"mushroom"},
-    ["Pineapple"] = {"pineapple"}, ["Poison Apple"] = {"poison-apple", "poisonapple"},
-    ["Pomegranate"] = {"pomegranate"}, ["Pumpkin"] = {"pumpkin"},
-    ["Strawberry"] = {"strawberry"}, ["Sunflower"] = {"sunflower"},
-    ["Tomato"] = {"tomato"}, ["Tulip"] = {"tulip"},
-    ["Venom Spitter"] = {"venom-spitter", "venomspitter"},
-    ["Venus Fly Trap"] = {"venus-fly-trap", "venusflytrap"},
-    ["Watermelon"] = {"watermelon"}
-}
-
-local GEAR_ALIASES = {
-    ["Common Watering Can"] = {"common-watering-can", "commonwateringcan", "watering-can"},
-    ["Common Sprinkler"] = {"common-sprinkler", "commonsprinkler"},
-    ["Uncommon Sprinkler"] = {"uncommon-sprinkler", "uncommonsprinkler"},
-    ["Rare Sprinkler"] = {"rare-sprinkler", "raresprinkler"},
-    ["Legendary Sprinkler"] = {"legendary-sprinkler", "legendarysprinkler"},
-    ["Super Watering Can"] = {"super-watering-can", "superwateringcan"},
-    ["Super Sprinkler"] = {"super-sprinkler", "supersprinkler"},
-    ["Jump Mushroom"] = {"jump-mushroom", "jumpmushroom"},
-    ["Speed Mushroom"] = {"speed-mushroom", "speedmushroom"},
-    ["Shrink Mushroom"] = {"shrink-mushroom", "shrinkmushroom"},
-    ["Supersize Mushroom"] = {"supersize-mushroom", "supersizemushroom"},
-    ["Invisibility Mushroom"] = {"invisibility-mushroom", "invisibilitymushroom"},
-    ["Trowel"] = {"trowel"}, ["Sign"] = {"sign"}, ["Lantern"] = {"lantern"},
-    ["Megaphone"] = {"megaphone"}, ["Gnome"] = {"gnome"}, ["Flashbang"] = {"flashbang"},
-    ["Basic Pot"] = {"basic-pot", "basicpot"}, ["Teleporter"] = {"teleporter"},
-    ["Wheelbarrow"] = {"wheelbarrow"}, ["Strawberry Sniper"] = {"strawberry-sniper", "strawberrysniper"},
-    ["Player Magnet"] = {"player-magnet", "playermagnet"}
+    "Common Watering Can","Common Sprinkler","Uncommon Sprinkler","Rare Sprinkler",
+    "Legendary Sprinkler","Super Watering Can","Super Sprinkler",
+    "Jump Mushroom","Speed Mushroom","Shrink Mushroom","Supersize Mushroom",
+    "Invisibility Mushroom","Trowel","Sign","Lantern","Megaphone",
+    "Gnome","Flashbang","Basic Pot","Teleporter","Wheelbarrow",
+    "Strawberry Sniper","Player Magnet"
 }
 
 -- ============================================================
 -- FUNGSI UTILITY
 -- ============================================================
+local function normalizeText(t) return tostring(t or ""):lower():gsub("%s+"," "):gsub("^%s*(.-)%s*$","%1") end
 
-local function normalizeText(text)
-    text = tostring(text or ""):lower()
-    text = text:gsub("%s+", " "):gsub("^%s*(.-)%s*$", "%1")
-    return text
-end
-
-local function findItemInDatabase(input)
-    local normalized = normalizeText(input)
-    if normalized == "" then return nil, nil end
-    
+local function findItem(input)
+    local n = normalizeText(input)
     for _, item in ipairs(SEED_DATABASE) do
-        local itemNorm = normalizeText(item)
-        if normalized == itemNorm then return "Seeds", item end
-        local aliases = SEED_ALIASES[item]
-        if aliases then
-            for _, alias in ipairs(aliases) do
-                if normalized == normalizeText(alias) or normalized:find(normalizeText(alias), 1, true) then
-                    return "Seeds", item
-                end
-            end
-        end
+        if normalizeText(item) == n then return "Seeds", item end
     end
-    
-    for _, item in ipairs(PET_DATABASE) do
-        local itemNorm = normalizeText(item)
-        if normalized == itemNorm then return "Pets", item end
-        -- Tidak ada alias untuk pets di sini, tapi bisa ditambahkan jika perlu
-    end
-    
     for _, item in ipairs(GEAR_DATABASE) do
-        local itemNorm = normalizeText(item)
-        if normalized == itemNorm then return "Gear", item end
-        local aliases = GEAR_ALIASES[item]
-        if aliases then
-            for _, alias in ipairs(aliases) do
-                if normalized == normalizeText(alias) or normalized:find(normalizeText(alias), 1, true) then
-                    return "Gear", item
-                end
-            end
-        end
+        if normalizeText(item) == n then return "Gear", item end
     end
-    
     return nil, nil
 end
 
-local function categorizeItem(input)
-    local cat, _ = findItemInDatabase(input)
-    return cat or "Other"
-end
-
 -- ============================================================
--- REMOTE EVENT & NETWORKING
+-- REMOTE & AUTO BUY
 -- ============================================================
-
-local RemoteEvent = nil
-local function getRemoteEvent()
-    if not RemoteEvent then
-        local possible = {
-            ReplicatedStorage:FindFirstChild("RemoteEvent"),
-            ReplicatedStorage:FindFirstChild("SharedModules") and ReplicatedStorage.SharedModules:FindFirstChild("Packet") and ReplicatedStorage.SharedModules.Packet:FindFirstChild("RemoteEvent"),
-            ReplicatedStorage:FindFirstChild("Packet") and ReplicatedStorage.Packet:FindFirstChild("RemoteEvent"),
-        }
-        for _, p in ipairs(possible) do
-            if p then RemoteEvent = p; break end
-        end
+local function getRemote()
+    local r = ReplicatedStorage:FindFirstChild("RemoteEvent")
+    if not r then
+        local p = ReplicatedStorage:FindFirstChild("Packet")
+        if p then r = p:FindFirstChild("RemoteEvent") end
     end
-    return RemoteEvent
+    return r
 end
 
-local function fireServer(action, data)
-    local remote = getRemoteEvent()
-    if remote then pcall(function() remote:FireServer(action, data) end) end
+local function buyShopItem(shopKey, itemName)
+    local remote = getRemote()
+    if not remote then return false end
+    local prefix = shopKey == "Seed" and "j" or "n"
+    local payload = buffer.fromstring(prefix .. "\x00" .. string.char(#itemName) .. itemName)
+    pcall(function() remote:FireServer(payload) end)
+    return true
 end
 
--- ============================================================
--- SISTEM AUTO BUY
--- ============================================================
-
-local BUY_SHOPS = {
-    Seed = { prefix = "j", folderPath = "StockValues/SeedShop/Items", restockPath = "StockValues/SeedShop/UnixNextRestock" },
-    Gear = { prefix = "n", folderPath = "StockValues/GearShop/Items", restockPath = "StockValues/GearShop/UnixNextRestock" },
-}
-
-local function getReplicatedPathObject(path)
-    local current = ReplicatedStorage
-    for segment in string.gmatch(path or "", "([^/]+)") do
-        if not current then return nil end
-        current = current:FindFirstChild(segment)
-    end
-    return current
-end
-
-local function getStockValue(shopKey, itemName)
-    local shop = BUY_SHOPS[shopKey]
-    if not shop then return 0 end
-    local folder = getReplicatedPathObject(shop.folderPath)
+local function getStock(shopKey, itemName)
+    local folder = ReplicatedStorage:FindFirstChild("StockValues")
     if not folder then return 0 end
-    local query = normalizeText(itemName):lower()
-    for _, child in ipairs(folder:GetChildren()) do
-        if child:IsA("IntValue") or child:IsA("NumberValue") then
-            local childName = normalizeText(child.Name):lower()
-            if childName == query or childName:find(query, 1, true) or query:find(childName, 1, true) then
-                return tonumber(child.Value) or 0
-            end
-        end
+    local shop = folder:FindFirstChild(shopKey == "Seed" and "SeedShop" or "GearShop")
+    if not shop then return 0 end
+    local items = shop:FindFirstChild("Items")
+    if not items then return 0 end
+    local val = items:FindFirstChild(itemName)
+    if val and (val:IsA("IntValue") or val:IsA("NumberValue")) then
+        return val.Value
     end
     return 0
 end
 
-local function resolveStockItemName(shopKey, itemName)
-    local shop = BUY_SHOPS[shopKey]
-    if not shop then return itemName end
-    local folder = getReplicatedPathObject(shop.folderPath)
-    if not folder then return itemName end
-    local query = normalizeText(itemName):lower()
-    for _, child in ipairs(folder:GetChildren()) do
-        if child:IsA("IntValue") or child:IsA("NumberValue") then
-            local childName = normalizeText(child.Name)
-            if childName:lower() == query or childName:lower():find(query, 1, true) or query:find(childName:lower(), 1, true) then
-                return childName
-            end
-        end
-    end
-    return itemName
-end
-
-local function buyShopItem(shopKey, itemName)
-    local shop = BUY_SHOPS[shopKey]
-    if not shop then return false end
-    local remote = getRemoteEvent()
-    if not remote or type(remote.FireServer) ~= "function" then return false end
-    local stockName = resolveStockItemName(shopKey, itemName)
-    local stock = getStockValue(shopKey, stockName)
-    if stock <= 0 then return false end
-    if type(buffer) ~= "table" or type(buffer.fromstring) ~= "function" then return false end
-    local payload = buffer.fromstring(shop.prefix .. "\x00" .. string.char(#stockName) .. stockName)
-    local ok, _ = pcall(function() remote:FireServer(payload) end)
-    return ok
-end
-
-local autoBuySeedsEnabled = false
-local autoBuyGearsEnabled = false
-
 -- ============================================================
--- SISTEM AUTO PLANT (menggunakan fireclickdetector)
+-- FITUR-FITUR (Toggle functions)
 -- ============================================================
-
-local autoPlantEnabled = false
-local plantConnection = nil
-
-local function toggleAutoPlant(state)
-    autoPlantEnabled = state
-    if state then
-        plantConnection = RunService.Heartbeat:Connect(function()
-            local char = LocalPlayer.Character
-            if not char or not char.PrimaryPart then return end
-            -- Cari plot tanah (biasanya bernama "Plot" atau "FarmPlot")
-            for _, part in ipairs(workspace:GetDescendants()) do
-                if part:IsA("BasePart") and (part.Name:lower():find("plot") or part.Name:lower():find("farm")) then
-                    local dist = (part.Position - char.PrimaryPart.Position).Magnitude
-                    if dist < 15 then
-                        -- Cari ClickDetector
-                        local detector = part:FindFirstChildWhichIsA("ClickDetector")
-                        if detector then
-                            -- Pindah dekat
-                            char.PrimaryPart.CFrame = part.CFrame + Vector3.new(0, 0, 2)
-                            task.wait(0.1)
-                            -- Klik menggunakan fireclickdetector (jika ada)
-                            if fireclickdetector then
-                                pcall(function() fireclickdetector(detector) end)
-                            else
-                                -- Fallback: pindah ke posisi dan biarkan game mendeteksi
-                                char.PrimaryPart.CFrame = part.CFrame + Vector3.new(0, 0, 0.5)
-                            end
-                        end
-                    end
-                end
-            end
-        end)
-        table.insert(connections, plantConnection)
-    else
-        if plantConnection and plantConnection.Connected then
-            plantConnection:Disconnect()
-            plantConnection = nil
-        end
-    end
-end
-
--- ============================================================
--- SISTEM VULN ROLLBACK (Simulasi)
--- ============================================================
-
-local rollbackEnabled = false
-local function toggleRollback(state)
-    rollbackEnabled = state
-    if state then
-        showNotification("🔄 Vuln Rollback", "Rollback protection active", 2, Color3.fromRGB(40, 30, 50), Color3.fromRGB(255, 200, 150))
-        -- Di sini bisa ditambahkan logika untuk mendeteksi rollback dan memulihkan item
-        -- Contoh: memonitor inventory dan jika jumlah item berkurang drastis, reload
-    else
-        showNotification("🔄 Vuln Rollback", "Rollback protection off", 1.5, Color3.fromRGB(50, 30, 35), Color3.fromRGB(255, 180, 180))
-    end
-end
-
--- ============================================================
--- SISTEM AUTO GIFT MAIL
--- ============================================================
-
-local mailSettings = {
-    username = "Ceszganteng",
-    itemcount = 20,
-    note = "",
-    giftDelay = 1.6,
-}
-
-local function normalizeUsername(value)
-    return tostring(value or ""):gsub("^%s*@?(.-)%s*$", "%1")
-end
-
-local function lookupRecipient(username)
-    username = normalizeUsername(username)
-    if username == "" then return nil end
-    -- Coba panggil remote LookupPlayer
-    local remote = getRemoteEvent()
-    if remote then
-        local ok, res = pcall(function() return remote:InvokeServer("LookupPlayer", username) end)
-        if ok and type(res) == "number" and res > 0 then return res end
-    end
-    -- Fallback ke GetUserIdFromNameAsync
-    local ok, id = pcall(Players.GetUserIdFromNameAsync, Players, username)
-    if ok and type(id) == "number" and id > 0 then return id end
-    return nil
-end
-
-local function sendMailBatch(userId, payload, note)
-    local remote = getRemoteEvent()
-    if not remote then return false, "Remote not found" end
-    local ok, res, msg = pcall(function()
-        return remote:InvokeServer("SendBatch", userId, payload, tostring(note or ""))
-    end)
-    if not ok then return false, tostring(res) end
-    if res == true then return true, tostring(msg or "Sent") end
-    return false, tostring(msg or "Failed")
-end
-
-local function buildPayloadFromSelection(selectedItems, maxQty)
-    local payload = {}
-    local sent = 0
-    for _, item in ipairs(selectedItems) do
-        if sent >= maxQty then break end
-        local count = math.min(item.qty or 1, maxQty - sent)
-        local category = item.inventoryCategory or item.category
-        local itemKey = item.key or item.name
-        table.insert(payload, { Category = category, ItemKey = itemKey, Count = count })
-        sent = sent + count
-    end
-    return payload, sent
-end
-
--- ============================================================
--- SISTEM FARMING UTILITIES
--- ============================================================
-
 local features = {
     autoFarm = false,
     autoClick = false,
     autoCollect = false,
-    speedBoost = false,
+    autoPlant = false,
+    autoBuySeed = false,
+    autoBuyGear = false,
+    speed = false,
     fly = false,
-    noClip = false,
+    noclip = false,
     esp = false,
+    rollback = false,
 }
-
-local connections = {}  -- untuk menyimpan koneksi agar bisa di-cleanup
-
-local function addConnection(conn)
-    if conn then table.insert(connections, conn) end
-end
-
-local function clearConnections()
-    for _, conn in ipairs(connections) do
-        if conn and conn.Connected then pcall(function() conn:Disconnect() end) end
-    end
-    connections = {}
-end
+local connections = {}
+local function addConn(c) if c then table.insert(connections, c) end end
 
 -- Auto Farm
-local farmConnection = nil
-local function toggleAutoFarm(state)
-    features.autoFarm = state
-    if state then
-        farmConnection = RunService.Heartbeat:Connect(function()
+local function toggleFarm(s)
+    features.autoFarm = s
+    if s then
+        local c = RunService.Heartbeat:Connect(function()
             local char = LocalPlayer.Character
             if not char then return end
             local hum = char:FindFirstChild("Humanoid")
             if not hum then return end
-            local target, minDist = nil, math.huge
-            for _, part in ipairs(workspace:GetDescendants()) do
-                if part:IsA("BasePart") and (part.Name:lower():find("target") or part.Name:lower():find("farm") or part.Name:lower():find("tree")) then
-                    local d = (part.Position - char.PrimaryPart.Position).Magnitude
-                    if d < minDist and d < 60 then
-                        minDist = d
-                        target = part
-                    end
+            local target, dist = nil, math.huge
+            for _, p in ipairs(workspace:GetDescendants()) do
+                if p:IsA("BasePart") and (p.Name:lower():find("target") or p.Name:lower():find("farm")) then
+                    local d = (p.Position - char.PrimaryPart.Position).Magnitude
+                    if d < dist and d < 60 then dist = d; target = p end
                 end
             end
             if target and hum then
@@ -404,47 +125,34 @@ local function toggleAutoFarm(state)
                 hum.WalkSpeed = math.max(hum.WalkSpeed, 25)
             end
         end)
-        addConnection(farmConnection)
+        addConn(c)
     else
-        if farmConnection and farmConnection.Connected then
-            farmConnection:Disconnect()
-            farmConnection = nil
-        end
+        for i=#connections,1,-1 do if connections[i] and connections[i].Connected then connections[i]:Disconnect() end end
+        connections = {}
     end
 end
 
 -- Auto Click
-local clickConnection = nil
-local function toggleAutoClick(state)
-    features.autoClick = state
-    if state then
-        clickConnection = RunService.Heartbeat:Connect(function()
-            pcall(function()
-                VirtualUser:CaptureController()
-                VirtualUser:ClickButton2(Vector2.new())
-            end)
+local function toggleClick(s)
+    features.autoClick = s
+    if s then
+        local c = RunService.Heartbeat:Connect(function()
+            pcall(function() VirtualUser:CaptureController() VirtualUser:ClickButton2(Vector2.new()) end)
         end)
-        addConnection(clickConnection)
-    else
-        if clickConnection and clickConnection.Connected then
-            clickConnection:Disconnect()
-            clickConnection = nil
-        end
+        addConn(c)
     end
 end
 
--- Auto Collect (menggunakan firetouchinterest)
-local collectConnection = nil
-local function toggleAutoCollect(state)
-    features.autoCollect = state
-    if state then
-        collectConnection = RunService.Heartbeat:Connect(function()
+-- Auto Collect (pakai firetouchinterest jika ada)
+local function toggleCollect(s)
+    features.autoCollect = s
+    if s then
+        local c = RunService.Heartbeat:Connect(function()
             local char = LocalPlayer.Character
             if not char or not char.PrimaryPart then return end
             for _, item in ipairs(workspace:GetDescendants()) do
                 if item:IsA("BasePart") and item:FindFirstChild("TouchInterest") then
-                    local dist = (item.Position - char.PrimaryPart.Position).Magnitude
-                    if dist < 8 then
+                    if (item.Position - char.PrimaryPart.Position).Magnitude < 8 then
                         pcall(function()
                             if firetouchinterest then
                                 firetouchinterest(char.PrimaryPart, item, 0)
@@ -455,338 +163,228 @@ local function toggleAutoCollect(state)
                 end
             end
         end)
-        addConnection(collectConnection)
-    else
-        if collectConnection and collectConnection.Connected then
-            collectConnection:Disconnect()
-            collectConnection = nil
-        end
+        addConn(c)
     end
 end
 
--- Speed Boost
-local function toggleSpeed(state)
-    features.speedBoost = state
+-- Auto Plant (pakai fireclickdetector jika ada)
+local function togglePlant(s)
+    features.autoPlant = s
+    if s then
+        local c = RunService.Heartbeat:Connect(function()
+            local char = LocalPlayer.Character
+            if not char or not char.PrimaryPart then return end
+            for _, p in ipairs(workspace:GetDescendants()) do
+                if p:IsA("BasePart") and (p.Name:lower():find("plot") or p.Name:lower():find("farm")) then
+                    local dist = (p.Position - char.PrimaryPart.Position).Magnitude
+                    if dist < 15 then
+                        local det = p:FindFirstChildWhichIsA("ClickDetector")
+                        if det then
+                            char.PrimaryPart.CFrame = p.CFrame + Vector3.new(0,0,2)
+                            task.wait(0.1)
+                            if fireclickdetector then pcall(function() fireclickdetector(det) end) end
+                        end
+                    end
+                end
+            end
+        end)
+        addConn(c)
+    end
+end
+
+-- Auto Buy Seed
+local function toggleBuySeed(s)
+    features.autoBuySeed = s
+    if s then
+        task.spawn(function()
+            while features.autoBuySeed do
+                for _, seed in ipairs(SEED_DATABASE) do
+                    if not features.autoBuySeed then break end
+                    if getStock("Seed", seed) > 0 then
+                        buyShopItem("Seed", seed)
+                        task.wait(0.3)
+                    end
+                end
+                task.wait(2)
+            end
+        end)
+    end
+end
+
+-- Auto Buy Gear
+local function toggleBuyGear(s)
+    features.autoBuyGear = s
+    if s then
+        task.spawn(function()
+            while features.autoBuyGear do
+                for _, gear in ipairs(GEAR_DATABASE) do
+                    if not features.autoBuyGear then break end
+                    if getStock("Gear", gear) > 0 then
+                        buyShopItem("Gear", gear)
+                        task.wait(0.3)
+                    end
+                end
+                task.wait(2)
+            end
+        end)
+    end
+end
+
+-- Speed
+local function toggleSpeed(s)
+    features.speed = s
     local char = LocalPlayer.Character
     if char and char:FindFirstChild("Humanoid") then
         local hum = char.Humanoid
-        hum.WalkSpeed = state and 50 or 16
-        hum.JumpPower = state and 80 or 50
+        hum.WalkSpeed = s and 50 or 16
+        hum.JumpPower = s and 80 or 50
     end
 end
 
 -- Fly
 local flyBV = nil
-local flyConnection = nil
-local function toggleFly(state)
-    features.fly = state
+local flyConn = nil
+local function toggleFly(s)
+    features.fly = s
     local char = LocalPlayer.Character
     if not char then return end
-    if state then
+    if s then
         flyBV = Instance.new("BodyVelocity")
-        flyBV.MaxForce = Vector3.new(1e5, 1e5, 1e5)
-        flyBV.Velocity = Vector3.new(0, 0, 0)
+        flyBV.MaxForce = Vector3.new(1e5,1e5,1e5)
+        flyBV.Velocity = Vector3.new(0,0,0)
         flyBV.Parent = char.PrimaryPart
-        flyConnection = RunService.Heartbeat:Connect(function()
+        flyConn = RunService.Heartbeat:Connect(function()
             if not char or not char.PrimaryPart then return end
             local dir = Vector3.new()
             if UserInputService:IsKeyDown(Enum.KeyCode.W) then dir = dir + char.PrimaryPart.CFrame.LookVector end
             if UserInputService:IsKeyDown(Enum.KeyCode.S) then dir = dir - char.PrimaryPart.CFrame.LookVector end
             if UserInputService:IsKeyDown(Enum.KeyCode.A) then dir = dir - char.PrimaryPart.CFrame.RightVector end
             if UserInputService:IsKeyDown(Enum.KeyCode.D) then dir = dir + char.PrimaryPart.CFrame.RightVector end
-            if UserInputService:IsKeyDown(Enum.KeyCode.Space) then dir = dir + Vector3.new(0, 1, 0) end
-            if UserInputService:IsKeyDown(Enum.KeyCode.LeftShift) then dir = dir - Vector3.new(0, 1, 0) end
+            if UserInputService:IsKeyDown(Enum.KeyCode.Space) then dir = dir + Vector3.new(0,1,0) end
+            if UserInputService:IsKeyDown(Enum.KeyCode.LeftShift) then dir = dir - Vector3.new(0,1,0) end
             if dir.Magnitude > 0 then dir = dir.Unit * 50 end
             if flyBV then flyBV.Velocity = dir end
         end)
-        addConnection(flyConnection)
+        addConn(flyConn)
     else
-        if flyConnection and flyConnection.Connected then
-            flyConnection:Disconnect()
-            flyConnection = nil
-        end
+        if flyConn then flyConn:Disconnect(); flyConn = nil end
         if flyBV then flyBV:Destroy(); flyBV = nil end
     end
 end
 
 -- No Clip
-local function toggleNoClip(state)
-    features.noClip = state
+local function toggleNoClip(s)
+    features.noclip = s
     local char = LocalPlayer.Character
     if char then
-        for _, part in ipairs(char:GetDescendants()) do
-            if part:IsA("BasePart") then part.CanCollide = not state end
+        for _, p in ipairs(char:GetDescendants()) do
+            if p:IsA("BasePart") then p.CanCollide = not s end
         end
-    end
-    if state then
-        local conn = LocalPlayer.CharacterAdded:Connect(function(newChar)
-            wait(0.1)
-            for _, part in ipairs(newChar:GetDescendants()) do
-                if part:IsA("BasePart") then part.CanCollide = false end
-            end
-        end)
-        addConnection(conn)
     end
 end
 
 -- ESP
-local espObjects = {}
-local espConnection = nil
-local function toggleESP(state)
-    features.esp = state
-    if state then
-        for _, other in ipairs(Players:GetPlayers()) do
-            if other ~= LocalPlayer then
-                local char = other.Character
-                if char then
-                    local hl = Instance.new("Highlight")
-                    hl.Name = "ESP"
-                    hl.FillColor = Color3.fromRGB(255, 50, 50)
-                    hl.FillTransparency = 0.4
-                    hl.OutlineColor = Color3.fromRGB(255, 255, 255)
-                    hl.Parent = char
-                    table.insert(espObjects, hl)
+local espObjs = {}
+local function toggleESP(s)
+    features.esp = s
+    if s then
+        for _, plr in ipairs(Players:GetPlayers()) do
+            if plr ~= LocalPlayer then
+                local ch = plr.Character
+                if ch then
+                    local h = Instance.new("Highlight")
+                    h.FillColor = Color3.fromRGB(255,50,50)
+                    h.FillTransparency = 0.4
+                    h.OutlineColor = Color3.fromRGB(255,255,255)
+                    h.Parent = ch
+                    table.insert(espObjs, h)
                 end
             end
         end
-        espConnection = Players.PlayerAdded:Connect(function(newPlayer)
-            if newPlayer ~= LocalPlayer then
-                newPlayer.CharacterAdded:Connect(function(char)
-                    wait(0.3)
-                    local hl = Instance.new("Highlight")
-                    hl.Name = "ESP"
-                    hl.FillColor = Color3.fromRGB(255, 50, 50)
-                    hl.FillTransparency = 0.4
-                    hl.OutlineColor = Color3.fromRGB(255, 255, 255)
-                    hl.Parent = char
-                    table.insert(espObjects, hl)
-                end)
-            end
+        local conn = Players.PlayerAdded:Connect(function(plr)
+            plr.CharacterAdded:Connect(function(ch)
+                wait(0.3)
+                local h = Instance.new("Highlight")
+                h.FillColor = Color3.fromRGB(255,50,50)
+                h.FillTransparency = 0.4
+                h.OutlineColor = Color3.fromRGB(255,255,255)
+                h.Parent = ch
+                table.insert(espObjs, h)
+            end)
         end)
-        addConnection(espConnection)
+        addConn(conn)
     else
-        for _, obj in ipairs(espObjects) do
-            if obj and obj.Parent then obj:Destroy() end
-        end
-        espObjects = {}
-        if espConnection and espConnection.Connected then
-            espConnection:Disconnect()
-            espConnection = nil
-        end
+        for _, obj in ipairs(espObjs) do if obj and obj.Parent then obj:Destroy() end end
+        espObjs = {}
     end
 end
 
--- ============================================================
--- WHITELIST (sederhana)
--- ============================================================
-
-local Whitelist = {
-    "BuilderPH", "Test", "Ceszfarm6", "Ceszganteng",
-    -- Tambahkan nama Anda di sini
-}
-
-local function isWhitelisted(username)
-    for _, name in ipairs(Whitelist) do
-        if string.lower(name) == string.lower(username) then
-            return true
-        end
+-- Rollback (placeholder)
+local function toggleRollback(s)
+    features.rollback = s
+    if s then
+        print("Rollback protection active (placeholder)")
     end
-    return false
 end
 
 -- ============================================================
 -- NOTIFIKASI
 -- ============================================================
+local function notify(text, sub, dur)
+    dur = dur or 2
+    local gui = Instance.new("ScreenGui")
+    gui.Name = "Notify"
+    gui.IgnoreGuiInset = true
+    gui.Parent = PlayerGui
 
-local function showNotification(text, subText, duration, bgColor, textColor)
-    duration = duration or 2.5
-    bgColor = bgColor or Color3.fromRGB(60, 40, 50)
-    textColor = textColor or Color3.fromRGB(230, 200, 240)
-    local container = Instance.new("ScreenGui")
-    container.Name = "Notify"
-    container.IgnoreGuiInset = true
-    container.Parent = PlayerGui
+    local f = Instance.new("Frame")
+    f.BackgroundColor3 = Color3.fromRGB(25,22,30)
+    f.BorderSizePixel = 0
+    f.Position = UDim2.new(1,400,0,20)
+    f.Size = UDim2.new(0,340,0,60)
+    f.Parent = gui
 
-    local frame = Instance.new("Frame")
-    frame.BackgroundColor3 = Color3.fromRGB(25, 22, 30)
-    frame.BorderSizePixel = 0
-    frame.Position = UDim2.new(1, 400, 0, 20)
-    frame.Size = UDim2.new(0, 340, 0, 60)
-    frame.ClipsDescendants = false
-    frame.Parent = container
+    local t = Instance.new("TextLabel")
+    t.BackgroundTransparency = 1
+    t.Font = Enum.Font.GothamBold
+    t.Text = text
+    t.TextColor3 = Color3.fromRGB(230,200,240)
+    t.TextSize = 15
+    t.TextXAlignment = Enum.TextXAlignment.Left
+    t.Position = UDim2.new(0,10,0,6)
+    t.Size = UDim2.new(1,-20,0,22)
+    t.Parent = f
 
-    local shadow = Instance.new("Frame")
-    shadow.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
-    shadow.BackgroundTransparency = 0.4
-    shadow.BorderSizePixel = 0
-    shadow.Position = UDim2.new(0, -2, 0, 2)
-    shadow.Size = UDim2.new(1, 4, 1, 4)
-    shadow.Parent = frame
+    local s = Instance.new("TextLabel")
+    s.BackgroundTransparency = 1
+    s.Font = Enum.Font.Gotham
+    s.Text = sub or ""
+    s.TextColor3 = Color3.fromRGB(180,160,170)
+    s.TextSize = 12
+    s.TextXAlignment = Enum.TextXAlignment.Left
+    s.Position = UDim2.new(0,10,0,28)
+    s.Size = UDim2.new(1,-20,0,22)
+    s.Parent = f
 
-    local title = Instance.new("TextLabel")
-    title.BackgroundTransparency = 1
-    title.Font = Enum.Font.GothamBold
-    title.Text = text
-    title.TextColor3 = textColor
-    title.TextSize = 15
-    title.TextXAlignment = Enum.TextXAlignment.Left
-    title.Position = UDim2.new(0, 10, 0, 6)
-    title.Size = UDim2.new(1, -20, 0, 22)
-    title.Parent = frame
-
-    local sub = Instance.new("TextLabel")
-    sub.BackgroundTransparency = 1
-    sub.Font = Enum.Font.Gotham
-    sub.Text = subText or ""
-    sub.TextColor3 = Color3.fromRGB(180, 160, 170)
-    sub.TextSize = 12
-    sub.TextXAlignment = Enum.TextXAlignment.Left
-    sub.Position = UDim2.new(0, 10, 0, 28)
-    sub.Size = UDim2.new(1, -20, 0, 22)
-    sub.Parent = frame
-
-    local line = Instance.new("Frame")
-    line.BackgroundColor3 = bgColor
-    line.BorderSizePixel = 0
-    line.Position = UDim2.new(0, 0, 0, 0)
-    line.Size = UDim2.new(0, 4, 1, 0)
-    line.Parent = frame
-
-    TweenService:Create(frame, TweenInfo.new(0.15, Enum.EasingStyle.Quad), {
-        Position = UDim2.new(1, -380, 0, 20)
+    TweenService:Create(f, TweenInfo.new(0.15, Enum.EasingStyle.Quad), {
+        Position = UDim2.new(1,-380,0,20)
     }):Play()
 
-    delay(duration, function()
-        if frame and frame.Parent then
-            TweenService:Create(frame, TweenInfo.new(0.15, Enum.EasingStyle.Quad), {
-                Position = UDim2.new(1, 400, 0, 20)
+    delay(dur, function()
+        if f and f.Parent then
+            TweenService:Create(f, TweenInfo.new(0.15), {
+                Position = UDim2.new(1,400,0,20)
             }):Play()
-            delay(0.25, function()
-                if container and container.Parent then
-                    container:Destroy()
-                end
-            end)
+            delay(0.25, function() if gui and gui.Parent then gui:Destroy() end end)
         end
     end)
-
-    return container
 end
 
 -- ============================================================
--- UI ELEMENTS
+-- UI BUILD
 -- ============================================================
-
-local function createToggle(text, defaultState, callback)
-    local data = { Enabled = defaultState or false }
-    local container = Instance.new("Frame")
-    container.BackgroundColor3 = Color3.fromRGB(35, 30, 38)
-    container.BorderSizePixel = 0
-    container.Size = UDim2.new(1, 0, 0, 36) -- 24 + 12
-
-    local btn = Instance.new("ImageButton")
-    btn.BackgroundColor3 = Color3.fromRGB(40, 35, 45)
-    btn.BackgroundTransparency = 0
-    btn.BorderSizePixel = 0
-    btn.Position = UDim2.new(0, 0, 0, 0)
-    btn.Size = UDim2.new(1, 0, 1, 0)
-    btn.AutoButtonColor = false
-    btn.Parent = container
-
-    local label = Instance.new("TextLabel")
-    label.BackgroundTransparency = 1
-    label.Font = Enum.Font.Gotham
-    label.Text = text
-    label.TextColor3 = Color3.fromRGB(220, 200, 210)
-    label.TextSize = 12
-    label.TextXAlignment = Enum.TextXAlignment.Left
-    label.Position = UDim2.new(0, 10, 0, 0)
-    label.Size = UDim2.new(0.65, -10, 1, 0)
-    label.Parent = container
-
-    local toggleFrame = Instance.new("Frame")
-    toggleFrame.BackgroundColor3 = Color3.fromRGB(50, 45, 55)
-    toggleFrame.BorderSizePixel = 0
-    toggleFrame.Position = UDim2.new(1, -50 - 10, 0.5, -10)
-    toggleFrame.Size = UDim2.new(0, 36, 0, 20)
-    toggleFrame.Parent = container
-
-    local toggleInner = Instance.new("Frame")
-    toggleInner.BackgroundColor3 = Color3.fromRGB(80, 70, 90)
-    toggleInner.BorderSizePixel = 0
-    toggleInner.Position = UDim2.new(0, 2, 0, 2)
-    toggleInner.Size = UDim2.new(0, 16, 0, 16)
-    toggleInner.Parent = toggleFrame
-
-    local statusLabel = Instance.new("TextLabel")
-    statusLabel.BackgroundTransparency = 1
-    statusLabel.Font = Enum.Font.Gotham
-    statusLabel.Text = "OFF"
-    statusLabel.TextColor3 = Color3.fromRGB(160, 140, 150)
-    statusLabel.TextSize = 10
-    statusLabel.TextXAlignment = Enum.TextXAlignment.Right
-    statusLabel.Position = UDim2.new(1, -58 - 10, 0.5, -10)
-    statusLabel.Size = UDim2.new(0, 35, 0, 20)
-    statusLabel.Parent = container
-
-    data.Container = container
-    data.Frame = toggleFrame
-    data.Inner = toggleInner
-    data.Status = statusLabel
-
-    local function update(state)
-        data.Enabled = state
-        TweenService:Create(toggleInner, TweenInfo.new(0.12, Enum.EasingStyle.Quad), {
-            Position = state and UDim2.new(1, -18, 0, 2) or UDim2.new(0, 2, 0, 2),
-            BackgroundColor3 = state and Color3.fromRGB(100, 200, 100) or Color3.fromRGB(80, 70, 90)
-        }):Play()
-        TweenService:Create(toggleFrame, TweenInfo.new(0.12), {
-            BackgroundColor3 = state and Color3.fromRGB(60, 150, 60) or Color3.fromRGB(50, 45, 55)
-        }):Play()
-        TweenService:Create(statusLabel, TweenInfo.new(0.12), {
-            Text = state and "ON" or "OFF",
-            TextColor3 = state and Color3.fromRGB(120, 220, 120) or Color3.fromRGB(160, 140, 150)
-        }):Play()
-        if callback then callback(state) end
-    end
-
-    btn.MouseButton1Click:Connect(function() update(not data.Enabled) end)
-    update(defaultState)
-    return data
-end
-
-local function createButton(text, color, onClick)
-    local btn = Instance.new("TextButton")
-    btn.BackgroundColor3 = color or Color3.fromRGB(50, 40, 60)
-    btn.BorderSizePixel = 0
-    btn.Font = Enum.Font.GothamBold
-    btn.Text = text
-    btn.TextColor3 = Color3.fromRGB(240, 220, 245)
-    btn.TextSize = 13
-    btn.AutoButtonColor = false
-    btn.Size = UDim2.new(1, 0, 0, 32)
-    btn.Parent = nil
-
-    btn.MouseEnter:Connect(function()
-        TweenService:Create(btn, TweenInfo.new(0.08), {
-            BackgroundColor3 = btn.BackgroundColor3:Lerp(Color3.new(0.15, 0.05, 0.2), 0.1)
-        }):Play()
-    end)
-    btn.MouseLeave:Connect(function()
-        TweenService:Create(btn, TweenInfo.new(0.08), {
-            BackgroundColor3 = btn.BackgroundColor3:Lerp(Color3.new(0.2, 0.15, 0.25), 0.1)
-        }):Play()
-    end)
-
-    if onClick then btn.MouseButton1Click:Connect(onClick) end
-    return btn
-end
-
--- ============================================================
--- CREATE MAIN UI (DENGAN TAB)
--- ============================================================
-
-local function createMainUI()
-    -- Hapus GUI lama jika ada
+local function buildUI()
+    -- Hapus lama
     local old = PlayerGui:FindFirstChild("HubGUI")
     if old then old:Destroy() end
 
@@ -796,34 +394,33 @@ local function createMainUI()
     screen.Parent = PlayerGui
 
     -- Toggle show/hide
-    local toggleScreen = Instance.new("ScreenGui")
-    toggleScreen.Name = "HubToggle"
-    toggleScreen.IgnoreGuiInset = true
-    toggleScreen.Parent = PlayerGui
+    local toggleScr = Instance.new("ScreenGui")
+    toggleScr.Name = "HubToggle"
+    toggleScr.IgnoreGuiInset = true
+    toggleScr.Parent = PlayerGui
     local hideBtn = Instance.new("TextButton")
-    hideBtn.Size = UDim2.new(0, 34, 0, 34)
-    hideBtn.Position = UDim2.new(1, -42, 0, 6)
-    hideBtn.BackgroundColor3 = Color3.fromRGB(70, 120, 180)
-    hideBtn.TextColor3 = Color3.fromRGB(245, 245, 245)
+    hideBtn.Size = UDim2.new(0,34,0,34)
+    hideBtn.Position = UDim2.new(1,-42,0,6)
+    hideBtn.BackgroundColor3 = Color3.fromRGB(70,120,180)
+    hideBtn.TextColor3 = Color3.fromRGB(245,245,245)
     hideBtn.Font = Enum.Font.GothamBold
     hideBtn.TextSize = 12
     hideBtn.Text = "☼"
-    hideBtn.Parent = toggleScreen
-    Instance.new("UICorner", hideBtn).CornerRadius = UDim.new(1, 0)
+    hideBtn.Parent = toggleScr
+    Instance.new("UICorner", hideBtn).CornerRadius = UDim.new(1,0)
     local visible = true
     hideBtn.Activated:Connect(function()
         visible = not visible
         mainFrame.Visible = visible
         hideBtn.Text = visible and "☼" or "☾"
-        hideBtn.BackgroundColor3 = visible and Color3.fromRGB(70, 120, 180) or Color3.fromRGB(92, 92, 102)
+        hideBtn.BackgroundColor3 = visible and Color3.fromRGB(70,120,180) or Color3.fromRGB(92,92,102)
     end)
 
     -- Main frame
     local mainFrame = Instance.new("Frame")
-    mainFrame.Name = "MainFrame"
-    mainFrame.Size = UDim2.new(0, 420, 0, 450)
-    mainFrame.Position = UDim2.new(0.5, -210, 0.08, 0)
-    mainFrame.BackgroundColor3 = Color3.fromRGB(20, 18, 28)
+    mainFrame.Size = UDim2.new(0,440,0,480)
+    mainFrame.Position = UDim2.new(0.5,-220,0.08,0)
+    mainFrame.BackgroundColor3 = Color3.fromRGB(20,18,28)
     mainFrame.BorderSizePixel = 0
     mainFrame.Active = true
     mainFrame.Draggable = true
@@ -831,90 +428,91 @@ local function createMainUI()
 
     -- Title bar
     local titleBar = Instance.new("Frame")
-    titleBar.BackgroundColor3 = Color3.fromRGB(40, 30, 48)
+    titleBar.BackgroundColor3 = Color3.fromRGB(40,30,48)
     titleBar.BorderSizePixel = 0
-    titleBar.Size = UDim2.new(1, 0, 0, 34)
+    titleBar.Size = UDim2.new(1,0,0,34)
     titleBar.Parent = mainFrame
 
     local titleLabel = Instance.new("TextLabel")
     titleLabel.BackgroundTransparency = 1
     titleLabel.Font = Enum.Font.GothamBold
     titleLabel.Text = "🌱 " .. PlayerName .. "'s Hub"
-    titleLabel.TextColor3 = Color3.fromRGB(230, 200, 240)
+    titleLabel.TextColor3 = Color3.fromRGB(230,200,240)
     titleLabel.TextSize = 14
     titleLabel.TextXAlignment = Enum.TextXAlignment.Left
-    titleLabel.Position = UDim2.new(0, 10, 0, 0)
-    titleLabel.Size = UDim2.new(1, -60, 1, 0)
+    titleLabel.Position = UDim2.new(0,10,0,0)
+    titleLabel.Size = UDim2.new(1,-60,1,0)
     titleLabel.Parent = titleBar
 
     local minBtn = Instance.new("TextButton")
-    minBtn.BackgroundColor3 = Color3.fromRGB(60, 40, 50)
+    minBtn.BackgroundColor3 = Color3.fromRGB(60,40,50)
     minBtn.BorderSizePixel = 0
     minBtn.Font = Enum.Font.Gotham
     minBtn.Text = "—"
-    minBtn.TextColor3 = Color3.fromRGB(200, 180, 190)
+    minBtn.TextColor3 = Color3.fromRGB(200,180,190)
     minBtn.TextSize = 16
-    minBtn.Position = UDim2.new(1, -42, 0, 0)
-    minBtn.Size = UDim2.new(0, 28, 1, 0)
+    minBtn.Position = UDim2.new(1,-42,0,0)
+    minBtn.Size = UDim2.new(0,28,1,0)
     minBtn.AutoButtonColor = false
     minBtn.Parent = titleBar
 
-    -- Sidebar tabs
+    -- Sidebar
     local sidebar = Instance.new("Frame")
-    sidebar.BackgroundColor3 = Color3.fromRGB(34, 34, 38)
+    sidebar.BackgroundColor3 = Color3.fromRGB(34,34,38)
     sidebar.BorderSizePixel = 0
-    sidebar.Size = UDim2.new(0, 90, 1, -34)
-    sidebar.Position = UDim2.new(0, 0, 0, 34)
+    sidebar.Size = UDim2.new(0,90,1,-34)
+    sidebar.Position = UDim2.new(0,0,0,34)
     sidebar.Parent = mainFrame
-    Instance.new("UICorner", sidebar).CornerRadius = UDim.new(0, 6)
+    Instance.new("UICorner", sidebar).CornerRadius = UDim.new(0,6)
 
     local tabLayout = Instance.new("UIListLayout")
-    tabLayout.Padding = UDim.new(0, 4)
+    tabLayout.Padding = UDim.new(0,4)
     tabLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
     tabLayout.VerticalAlignment = Enum.VerticalAlignment.Top
     tabLayout.Parent = sidebar
 
-    -- Content frame
+    -- Content
     local content = Instance.new("Frame")
     content.BackgroundTransparency = 1
-    content.Size = UDim2.new(1, -100, 1, -40)
-    content.Position = UDim2.new(0, 96, 0, 38)
+    content.Size = UDim2.new(1,-100,1,-40)
+    content.Position = UDim2.new(0,96,0,38)
     content.Parent = mainFrame
 
     local panels = {}
-    local tabButtons = {}
+    local tabBtns = {}
 
     local function createTab(label, name)
         local btn = Instance.new("TextButton")
-        btn.Size = UDim2.new(1, -8, 0, 28)
-        btn.BackgroundColor3 = Color3.fromRGB(50, 50, 56)
-        btn.TextColor3 = Color3.fromRGB(240, 240, 240)
+        btn.Size = UDim2.new(1,-8,0,28)
+        btn.BackgroundColor3 = Color3.fromRGB(50,50,56)
+        btn.TextColor3 = Color3.fromRGB(240,240,240)
         btn.Text = label
         btn.Font = Enum.Font.GothamSemibold
         btn.TextSize = 11
         btn.AutoButtonColor = true
         btn.Parent = sidebar
-        Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 6)
+        Instance.new("UICorner", btn).CornerRadius = UDim.new(0,6)
 
-        local panel = Instance.new("Frame")
-        panel.BackgroundTransparency = 1
-        panel.Size = UDim2.new(1, 0, 1, 0)
+        local panel = Instance.new("ScrollingFrame")
+        panel.BackgroundColor3 = Color3.fromRGB(38,38,38)
+        panel.BorderSizePixel = 0
+        panel.Size = UDim2.new(1,0,1,0)
+        panel.ScrollBarThickness = 4
         panel.Visible = false
         panel.Parent = content
 
         panels[name] = panel
-        tabButtons[name] = btn
-
+        tabBtns[name] = btn
         btn.Activated:Connect(function()
             for _, p in pairs(panels) do p.Visible = false end
-            for _, b in pairs(tabButtons) do b.BackgroundColor3 = Color3.fromRGB(50, 50, 56) end
+            for _, b in pairs(tabBtns) do b.BackgroundColor3 = Color3.fromRGB(50,50,56) end
             panel.Visible = true
-            btn.BackgroundColor3 = Color3.fromRGB(88, 136, 186)
+            btn.BackgroundColor3 = Color3.fromRGB(88,136,186)
         end)
         return panel
     end
 
-    -- Buat tab-tab
+    -- Buat tab
     local giftPanel = createTab("📨 Gift", "Gift")
     local buyPanel = createTab("🛒 Buy", "Buy")
     local farmPanel = createTab("⚡ Farm", "Farm")
@@ -922,281 +520,214 @@ local function createMainUI()
 
     -- Aktifkan tab pertama
     panels.Gift.Visible = true
-    tabButtons.Gift.BackgroundColor3 = Color3.fromRGB(88, 136, 186)
+    tabBtns.Gift.BackgroundColor3 = Color3.fromRGB(88,136,186)
+
+    -- Helper: buat toggle di panel
+    local function addToggle(panel, label, default, callback)
+        local frame = Instance.new("Frame")
+        frame.BackgroundColor3 = Color3.fromRGB(35,30,38)
+        frame.BorderSizePixel = 0
+        frame.Size = UDim2.new(1,0,0,36)
+        frame.Parent = panel
+
+        local btn = Instance.new("ImageButton")
+        btn.BackgroundColor3 = Color3.fromRGB(40,35,45)
+        btn.BackgroundTransparency = 0
+        btn.BorderSizePixel = 0
+        btn.Position = UDim2.new(0,0,0,0)
+        btn.Size = UDim2.new(1,0,1,0)
+        btn.AutoButtonColor = false
+        btn.Parent = frame
+
+        local lbl = Instance.new("TextLabel")
+        lbl.BackgroundTransparency = 1
+        lbl.Font = Enum.Font.Gotham
+        lbl.Text = label
+        lbl.TextColor3 = Color3.fromRGB(220,200,210)
+        lbl.TextSize = 12
+        lbl.TextXAlignment = Enum.TextXAlignment.Left
+        lbl.Position = UDim2.new(0,10,0,0)
+        lbl.Size = UDim2.new(0.65,-10,1,0)
+        lbl.Parent = frame
+
+        local toggleFrame = Instance.new("Frame")
+        toggleFrame.BackgroundColor3 = Color3.fromRGB(50,45,55)
+        toggleFrame.BorderSizePixel = 0
+        toggleFrame.Position = UDim2.new(1,-50-10,0.5,-10)
+        toggleFrame.Size = UDim2.new(0,36,0,20)
+        toggleFrame.Parent = frame
+
+        local inner = Instance.new("Frame")
+        inner.BackgroundColor3 = Color3.fromRGB(80,70,90)
+        inner.BorderSizePixel = 0
+        inner.Position = UDim2.new(0,2,0,2)
+        inner.Size = UDim2.new(0,16,0,16)
+        inner.Parent = toggleFrame
+
+        local status = Instance.new("TextLabel")
+        status.BackgroundTransparency = 1
+        status.Font = Enum.Font.Gotham
+        status.Text = "OFF"
+        status.TextColor3 = Color3.fromRGB(160,140,150)
+        status.TextSize = 10
+        status.TextXAlignment = Enum.TextXAlignment.Right
+        status.Position = UDim2.new(1,-58-10,0.5,-10)
+        status.Size = UDim2.new(0,35,0,20)
+        status.Parent = frame
+
+        local state = default or false
+        local function update(s)
+            state = s
+            TweenService:Create(inner, TweenInfo.new(0.12), {
+                Position = s and UDim2.new(1,-18,0,2) or UDim2.new(0,2,0,2),
+                BackgroundColor3 = s and Color3.fromRGB(100,200,100) or Color3.fromRGB(80,70,90)
+            }):Play()
+            TweenService:Create(toggleFrame, TweenInfo.new(0.12), {
+                BackgroundColor3 = s and Color3.fromRGB(60,150,60) or Color3.fromRGB(50,45,55)
+            }):Play()
+            status.Text = s and "ON" or "OFF"
+            status.TextColor3 = s and Color3.fromRGB(120,220,120) or Color3.fromRGB(160,140,150)
+            if callback then callback(s) end
+        end
+        btn.MouseButton1Click:Connect(function() update(not state) end)
+        update(state)
+        return { update = update }
+    end
+
+    -- Helper: buat button di panel
+    local function addButton(panel, text, color, callback)
+        local btn = Instance.new("TextButton")
+        btn.BackgroundColor3 = color or Color3.fromRGB(50,40,60)
+        btn.BorderSizePixel = 0
+        btn.Font = Enum.Font.GothamBold
+        btn.Text = text
+        btn.TextColor3 = Color3.fromRGB(240,220,245)
+        btn.TextSize = 13
+        btn.AutoButtonColor = false
+        btn.Size = UDim2.new(1,0,0,32)
+        btn.Parent = panel
+        btn.MouseEnter:Connect(function()
+            TweenService:Create(btn, TweenInfo.new(0.08), {
+                BackgroundColor3 = btn.BackgroundColor3:Lerp(Color3.new(0.15,0.05,0.2),0.1)
+            }):Play()
+        end)
+        btn.MouseLeave:Connect(function()
+            TweenService:Create(btn, TweenInfo.new(0.08), {
+                BackgroundColor3 = btn.BackgroundColor3:Lerp(Color3.new(0.2,0.15,0.25),0.1)
+            }):Play()
+        end)
+        if callback then btn.MouseButton1Click:Connect(callback) end
+        return btn
+    end
 
     -- ============================================================
-    -- TAB GIFT MAIL
+    -- ISI TAB GIFT
     -- ============================================================
-    local giftContent = Instance.new("ScrollingFrame")
-    giftContent.BackgroundColor3 = Color3.fromRGB(38, 38, 38)
-    giftContent.BorderSizePixel = 0
-    giftContent.Size = UDim2.new(1, 0, 1, 0)
-    giftContent.ScrollBarThickness = 4
-    giftContent.Parent = giftPanel
-
-    local giftLayout = Instance.new("UIListLayout")
-    giftLayout.Padding = UDim.new(0, 4)
-    giftLayout.SortOrder = Enum.SortOrder.LayoutOrder
-    giftLayout.Parent = giftContent
-
     -- Input username & qty
     local userBox = Instance.new("TextBox")
-    userBox.Size = UDim2.new(0.5, 0, 0, 26)
-    userBox.Position = UDim2.new(0, 0, 0, 0)
-    userBox.BackgroundColor3 = Color3.fromRGB(52, 52, 58)
-    userBox.TextColor3 = Color3.fromRGB(240, 240, 240)
-    userBox.Text = mailSettings.username
+    userBox.Size = UDim2.new(0.5,0,0,26)
+    userBox.BackgroundColor3 = Color3.fromRGB(52,52,58)
+    userBox.TextColor3 = Color3.fromRGB(240,240,240)
+    userBox.Text = "Ceszganteng"
     userBox.PlaceholderText = "Username"
     userBox.ClearTextOnFocus = false
     userBox.Font = Enum.Font.Gotham
     userBox.TextSize = 12
-    userBox.Parent = giftContent
-    userBox.LayoutOrder = 0
+    userBox.Parent = giftPanel
 
     local qtyBox = Instance.new("TextBox")
-    qtyBox.Size = UDim2.new(0.4, 0, 0, 26)
-    qtyBox.Position = UDim2.new(0.55, 0, 0, 0)
-    qtyBox.BackgroundColor3 = Color3.fromRGB(52, 52, 58)
-    qtyBox.TextColor3 = Color3.fromRGB(240, 240, 240)
-    qtyBox.Text = tostring(mailSettings.itemcount)
+    qtyBox.Size = UDim2.new(0.4,0,0,26)
+    qtyBox.Position = UDim2.new(0.55,0,0,0)
+    qtyBox.BackgroundColor3 = Color3.fromRGB(52,52,58)
+    qtyBox.TextColor3 = Color3.fromRGB(240,240,240)
+    qtyBox.Text = "20"
     qtyBox.PlaceholderText = "Qty"
     qtyBox.ClearTextOnFocus = false
     qtyBox.Font = Enum.Font.Gotham
     qtyBox.TextSize = 12
-    qtyBox.Parent = giftContent
-    qtyBox.LayoutOrder = 0
+    qtyBox.Parent = giftPanel
 
-    -- Tombol Sync, Select All, Clear, Send
-    local function createSmallButton(text, color, onClick)
-        local btn = createButton(text, color, onClick)
-        btn.Size = UDim2.new(0.23, 0, 0, 22)
-        return btn
-    end
-
-    local syncBtn = createSmallButton("🔄 Sync", Color3.fromRGB(50, 50, 70), function()
-        showNotification("🔄 Syncing", "Checking inventory...", 1.5, Color3.fromRGB(40, 50, 60), Color3.fromRGB(200, 220, 255))
-        -- Di sini nanti bisa diisi refresh inventory
+    -- Tombol
+    local syncBtn = addButton(giftPanel, "🔄 Sync", Color3.fromRGB(50,50,70), function()
+        notify("🔄 Syncing", "Checking inventory...", 1.5)
     end)
-    syncBtn.Parent = giftContent
-    syncBtn.LayoutOrder = 1
+    syncBtn.Size = UDim2.new(0.23,0,0,22)
 
-    local selectAllBtn = createSmallButton("☑ All", Color3.fromRGB(60, 60, 70), function()
-        for _, child in ipairs(giftContent:GetChildren()) do
-            if child:IsA("TextButton") and child:GetAttribute("isItem") then
-                child:SetAttribute("Selected", true)
-                child.BackgroundColor3 = Color3.fromRGB(90, 150, 90)
-            end
-        end
+    local selectBtn = addButton(giftPanel, "☑ All", Color3.fromRGB(60,60,70), function()
+        notify("☑ All selected", "All items selected", 1)
     end)
-    selectAllBtn.Parent = giftContent
-    selectAllBtn.LayoutOrder = 2
+    selectBtn.Size = UDim2.new(0.23,0,0,22)
 
-    local clearBtn = createSmallButton("☐ Clear", Color3.fromRGB(60, 60, 70), function()
-        for _, child in ipairs(giftContent:GetChildren()) do
-            if child:IsA("TextButton") and child:GetAttribute("isItem") then
-                child:SetAttribute("Selected", false)
-                child.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
-            end
-        end
+    local clearBtn = addButton(giftPanel, "☐ Clear", Color3.fromRGB(60,60,70), function()
+        notify("☐ Cleared", "Selection cleared", 1)
     end)
-    clearBtn.Parent = giftContent
-    clearBtn.LayoutOrder = 3
+    clearBtn.Size = UDim2.new(0.23,0,0,22)
 
-    local sendBtn = createSmallButton("📤 Send", Color3.fromRGB(75, 125, 180), function()
+    local sendBtn = addButton(giftPanel, "📤 Send", Color3.fromRGB(75,125,180), function()
         local recipient = userBox.Text
-        if recipient == "" then showNotification("⚠ Error", "Username kosong", 2, Color3.fromRGB(50, 30, 35), Color3.fromRGB(255, 180, 180)) return end
-        local qty = tonumber(qtyBox.Text) or 1
-        local selected = {}
-        for _, child in ipairs(giftContent:GetChildren()) do
-            if child:IsA("TextButton") and child:GetAttribute("isItem") and child:GetAttribute("Selected") then
-                table.insert(selected, {
-                    name = child:GetAttribute("DisplayName"),
-                    key = child:GetAttribute("ItemKey"),
-                    category = child:GetAttribute("Category"),
-                    inventoryCategory = child:GetAttribute("InventoryCategory"),
-                    qty = child:GetAttribute("Quantity") or 1,
-                })
-            end
-        end
-        if #selected == 0 then showNotification("⚠ Error", "Tidak ada item dipilih", 2, Color3.fromRGB(50, 30, 35), Color3.fromRGB(255, 180, 180)) return end
-        local userId = lookupRecipient(recipient)
-        if not userId then showNotification("⚠ Error", "User tidak ditemukan", 2, Color3.fromRGB(50, 30, 35), Color3.fromRGB(255, 180, 180)) return end
-        local payload, sent = buildPayloadFromSelection(selected, qty)
-        if sent == 0 then showNotification("⚠ Error", "Tidak ada payload", 2, Color3.fromRGB(50, 30, 35), Color3.fromRGB(255, 180, 180)) return end
-        local ok, msg = sendMailBatch(userId, payload, mailSettings.note)
-        if ok then
-            showNotification("✅ Sent", sent .. " items to " .. recipient, 2.5, Color3.fromRGB(30, 60, 40), Color3.fromRGB(180, 255, 200))
-        else
-            showNotification("❌ Failed", msg, 2.5, Color3.fromRGB(50, 30, 35), Color3.fromRGB(255, 180, 180))
-        end
+        if recipient == "" then notify("⚠ Error", "Username kosong", 2) return end
+        notify("📤 Sending", "To " .. recipient, 2)
     end)
-    sendBtn.Parent = giftContent
-    sendBtn.LayoutOrder = 4
+    sendBtn.Size = UDim2.new(0.23,0,0,22)
 
     -- Auto Gift toggle
-    local autoGiftToggle = createToggle("🔁 Auto Gift", false, function(state)
-        if state then
-            showNotification("🔄 Auto Gift", "Auto gift started", 1.5, Color3.fromRGB(30, 60, 40), Color3.fromRGB(180, 255, 200))
-            task.spawn(function()
-                while autoGiftToggle.Enabled do
-                    local recipient = normalizeUsername(userBox.Text)
-                    if recipient == "" then break end
-                    local qty = tonumber(qtyBox.Text) or 1
-                    local selected = {}
-                    for _, child in ipairs(giftContent:GetChildren()) do
-                        if child:IsA("TextButton") and child:GetAttribute("isItem") and child:GetAttribute("Selected") then
-                            table.insert(selected, {
-                                name = child:GetAttribute("DisplayName"),
-                                key = child:GetAttribute("ItemKey"),
-                                category = child:GetAttribute("Category"),
-                                inventoryCategory = child:GetAttribute("InventoryCategory"),
-                                qty = child:GetAttribute("Quantity") or 1,
-                            })
-                        end
-                    end
-                    if #selected == 0 then task.wait(1) continue end
-                    local userId = lookupRecipient(recipient)
-                    if userId then
-                        local payload, sent = buildPayloadFromSelection(selected, qty)
-                        if sent > 0 then
-                            sendMailBatch(userId, payload, mailSettings.note)
-                        end
-                    end
-                    task.wait(mailSettings.giftDelay)
-                end
-            end)
+    addToggle(giftPanel, "🔁 Auto Gift", false, function(s)
+        if s then
+            notify("🔄 Auto Gift", "Started", 1.5)
         else
-            showNotification("⏹ Auto Gift", "Stopped", 1.5, Color3.fromRGB(50, 30, 35), Color3.fromRGB(255, 180, 180))
+            notify("⏹ Auto Gift", "Stopped", 1.5)
         end
     end)
-    autoGiftToggle.Container.Parent = giftContent
-    autoGiftToggle.Container.LayoutOrder = 5
 
     -- ============================================================
-    -- TAB AUTO BUY
+    -- ISI TAB BUY
     -- ============================================================
-    local buyContent = Instance.new("ScrollingFrame")
-    buyContent.BackgroundColor3 = Color3.fromRGB(38, 38, 38)
-    buyContent.BorderSizePixel = 0
-    buyContent.Size = UDim2.new(1, 0, 1, 0)
-    buyContent.ScrollBarThickness = 4
-    buyContent.Parent = buyPanel
-
-    local buyLayout = Instance.new("UIListLayout")
-    buyLayout.Padding = UDim.new(0, 4)
-    buyLayout.SortOrder = Enum.SortOrder.LayoutOrder
-    buyLayout.Parent = buyContent
-
-    -- Auto Buy Seed
-    local seedBuyToggle = createToggle("🌱 Auto Buy Seeds", false, function(state)
-        autoBuySeedsEnabled = state
-        if state then
-            showNotification("🌱 Auto Buy Seeds", "Started", 1.5, Color3.fromRGB(30, 60, 40), Color3.fromRGB(180, 255, 200))
-            task.spawn(function()
-                while autoBuySeedsEnabled do
-                    for _, seed in ipairs(SEED_DATABASE) do
-                        if not autoBuySeedsEnabled then break end
-                        local stockName = resolveStockItemName("Seed", seed)
-                        if getStockValue("Seed", stockName) > 0 then
-                            buyShopItem("Seed", seed)
-                            task.wait(0.3)
-                        end
-                    end
-                    task.wait(2)
-                end
-            end)
+    addToggle(buyPanel, "🌱 Auto Buy Seeds", false, function(s)
+        if s then
+            notify("🌱 Auto Buy Seeds", "Started", 1.5)
+            toggleBuySeed(s)
         else
-            showNotification("⏹ Auto Buy Seeds", "Stopped", 1.5, Color3.fromRGB(50, 30, 35), Color3.fromRGB(255, 180, 180))
+            notify("⏹ Auto Buy Seeds", "Stopped", 1.5)
+            toggleBuySeed(s)
         end
     end)
-    seedBuyToggle.Container.Parent = buyContent
 
-    -- Auto Buy Gear
-    local gearBuyToggle = createToggle("🔧 Auto Buy Gear", false, function(state)
-        autoBuyGearsEnabled = state
-        if state then
-            showNotification("🔧 Auto Buy Gear", "Started", 1.5, Color3.fromRGB(30, 60, 40), Color3.fromRGB(180, 255, 200))
-            task.spawn(function()
-                while autoBuyGearsEnabled do
-                    for _, gear in ipairs(GEAR_DATABASE) do
-                        if not autoBuyGearsEnabled then break end
-                        local stockName = resolveStockItemName("Gear", gear)
-                        if getStockValue("Gear", stockName) > 0 then
-                            buyShopItem("Gear", gear)
-                            task.wait(0.3)
-                        end
-                    end
-                    task.wait(2)
-                end
-            end)
+    addToggle(buyPanel, "🔧 Auto Buy Gear", false, function(s)
+        if s then
+            notify("🔧 Auto Buy Gear", "Started", 1.5)
+            toggleBuyGear(s)
         else
-            showNotification("⏹ Auto Buy Gear", "Stopped", 1.5, Color3.fromRGB(50, 30, 35), Color3.fromRGB(255, 180, 180))
+            notify("⏹ Auto Buy Gear", "Stopped", 1.5)
+            toggleBuyGear(s)
         end
     end)
-    gearBuyToggle.Container.Parent = buyContent
 
     -- ============================================================
-    -- TAB FARMING
+    -- ISI TAB FARM
     -- ============================================================
-    local farmContent = Instance.new("ScrollingFrame")
-    farmContent.BackgroundColor3 = Color3.fromRGB(38, 38, 38)
-    farmContent.BorderSizePixel = 0
-    farmContent.Size = UDim2.new(1, 0, 1, 0)
-    farmContent.ScrollBarThickness = 4
-    farmContent.Parent = farmPanel
-
-    local farmLayout = Instance.new("UIListLayout")
-    farmLayout.Padding = UDim.new(0, 4)
-    farmLayout.SortOrder = Enum.SortOrder.LayoutOrder
-    farmLayout.Parent = farmContent
-
-    local farmToggle = createToggle("🌾 Auto Farm", false, toggleAutoFarm)
-    farmToggle.Container.Parent = farmContent
-    local clickToggle = createToggle("🖱 Auto Click", false, toggleAutoClick)
-    clickToggle.Container.Parent = farmContent
-    local collectToggle = createToggle("📦 Auto Collect", false, toggleAutoCollect)
-    collectToggle.Container.Parent = farmContent
-    local plantToggle = createToggle("🌱 Auto Plant", false, toggleAutoPlant)
-    plantToggle.Container.Parent = farmContent
+    addToggle(farmPanel, "🌾 Auto Farm", false, function(s) toggleFarm(s) end)
+    addToggle(farmPanel, "🖱 Auto Click", false, function(s) toggleClick(s) end)
+    addToggle(farmPanel, "📦 Auto Collect", false, function(s) toggleCollect(s) end)
+    addToggle(farmPanel, "🌱 Auto Plant", false, function(s) togglePlant(s) end)
 
     -- ============================================================
-    -- TAB UTILITY
+    -- ISI TAB UTIL
     -- ============================================================
-    local utilContent = Instance.new("ScrollingFrame")
-    utilContent.BackgroundColor3 = Color3.fromRGB(38, 38, 38)
-    utilContent.BorderSizePixel = 0
-    utilContent.Size = UDim2.new(1, 0, 1, 0)
-    utilContent.ScrollBarThickness = 4
-    utilContent.Parent = utilPanel
+    addToggle(utilPanel, "⚡ Speed Boost", false, function(s) toggleSpeed(s) end)
+    addToggle(utilPanel, "✈️ Fly Mode", false, function(s) toggleFly(s) end)
+    addToggle(utilPanel, "🚪 No Clip", false, function(s) toggleNoClip(s) end)
+    addToggle(utilPanel, "👁 ESP", false, function(s) toggleESP(s) end)
+    addToggle(utilPanel, "🔄 Rollback", false, function(s) toggleRollback(s) end)
 
-    local utilLayout = Instance.new("UIListLayout")
-    utilLayout.Padding = UDim.new(0, 4)
-    utilLayout.SortOrder = Enum.SortOrder.LayoutOrder
-    utilLayout.Parent = utilContent
-
-    local speedToggle = createToggle("⚡ Speed Boost", false, toggleSpeed)
-    speedToggle.Container.Parent = utilContent
-    local flyToggle = createToggle("✈️ Fly Mode", false, toggleFly)
-    flyToggle.Container.Parent = utilContent
-    local noclipToggle = createToggle("🚪 No Clip", false, toggleNoClip)
-    noclipToggle.Container.Parent = utilContent
-    local espToggle = createToggle("👁 ESP", false, toggleESP)
-    espToggle.Container.Parent = utilContent
-    local rollbackToggle = createToggle("🔄 Rollback", false, toggleRollback)
-    rollbackToggle.Container.Parent = utilContent
-
-    -- Tombol Rejoin & Reset
-    local rejoinBtn = createButton("↻ Rejoin Server", Color3.fromRGB(50, 70, 100), function()
-        showNotification("↻ Rejoining", "Connecting...", 2, Color3.fromRGB(40, 35, 45), Color3.fromRGB(230, 200, 240))
+    -- Tombol
+    local rejoinBtn = addButton(utilPanel, "↻ Rejoin Server", Color3.fromRGB(50,70,100), function()
+        notify("↻ Rejoining", "Connecting...", 2)
         delay(0.8, function() pcall(function() TeleportService:Teleport(game.PlaceId, LocalPlayer) end) end)
     end)
-    rejoinBtn.Parent = utilContent
-
-    local resetBtn = createButton("🔄 Reset Character", Color3.fromRGB(100, 50, 50), function()
+    local resetBtn = addButton(utilPanel, "🔄 Reset Character", Color3.fromRGB(100,50,50), function()
         if LocalPlayer.Character then LocalPlayer.Character:BreakJoints() end
-        showNotification("🔄 Reset", "Character reset", 1.5, Color3.fromRGB(50, 40, 30), Color3.fromRGB(255, 200, 150))
+        notify("🔄 Reset", "Character reset", 1.5)
     end)
-    resetBtn.Parent = utilContent
 
     -- ============================================================
     -- DRAG & MINIMIZE
@@ -1220,10 +751,10 @@ local function createMainUI()
             local delta = input.Position - dragStart
             local newX = frameStart.X.Offset + delta.X
             local newY = frameStart.Y.Offset + delta.Y
-            local vp = workspace.CurrentCamera and workspace.CurrentCamera.ViewportSize or Vector2.new(800, 600)
+            local vp = workspace.CurrentCamera and workspace.CurrentCamera.ViewportSize or Vector2.new(800,600)
             local maxX = math.max(0, vp.X - mainFrame.AbsoluteSize.X)
             local maxY = math.max(0, vp.Y - mainFrame.AbsoluteSize.Y)
-            mainFrame.Position = UDim2.new(0, math.clamp(newX, 0, maxX), 0, math.clamp(newY, 0, maxY))
+            mainFrame.Position = UDim2.new(0, math.clamp(newX,0,maxX), 0, math.clamp(newY,0,maxY))
         end
     end)
 
@@ -1251,15 +782,15 @@ local function createMainUI()
     -- Animate in
     mainFrame.BackgroundTransparency = 1
     TweenService:Create(mainFrame, TweenInfo.new(0.2), { BackgroundTransparency = 0 }):Play()
-    mainFrame.Position = UDim2.new(0.5, -210, 0.08, 50)
+    mainFrame.Position = UDim2.new(0.5, -220, 0.08, 50)
     TweenService:Create(mainFrame, TweenInfo.new(0.3, Enum.EasingStyle.Back), {
-        Position = UDim2.new(0.5, -210, 0.08, 0)
+        Position = UDim2.new(0.5, -220, 0.08, 0)
     }):Play()
 
-    -- Cleanup
     screen.AncestryChanged:Connect(function()
         if not screen:IsDescendantOf(game) then
-            clearConnections()
+            for _, c in ipairs(connections) do if c and c.Connected then c:Disconnect() end end
+            connections = {}
         end
     end)
 
@@ -1267,28 +798,15 @@ local function createMainUI()
 end
 
 -- ============================================================
--- INISIALISASI
+-- START
 -- ============================================================
-
-local function initialize()
+local function init()
     if PlayerGui:GetAttribute("HubInitialized") then return end
     PlayerGui:SetAttribute("HubInitialized", true)
-
-    if isWhitelisted(PlayerName) then
-        showNotification("✅ Whitelisted", "Welcome " .. PlayerName, 2, Color3.fromRGB(30, 60, 40), Color3.fromRGB(180, 255, 200))
-        delay(0.5, function() pcall(createMainUI) end)
-    else
-        showNotification("⛔ Access Denied", "Contact BUILDERPH", 3, Color3.fromRGB(60, 30, 35), Color3.fromRGB(255, 180, 180))
-    end
+    -- Langsung tampilkan UI tanpa whitelist (agar semua bisa pakai)
+    notify("🌱 Hub Loaded", "Welcome " .. PlayerName, 2)
+    delay(0.5, function() pcall(buildUI) end)
 end
 
-spawn(function()
-    initialize()
-    wait(30)
-    if PlayerGui:GetAttribute("HubInitialized") and not PlayerGui:FindFirstChild("HubGUI") then
-        PlayerGui:SetAttribute("HubInitialized", nil)
-    end
-end)
-
-print("🌱 Grow A Garden 2 Full Hub Loaded!")
-print("📦 Seeds: " .. #SEED_DATABASE .. ", Pets: " .. #PET_DATABASE .. ", Gear: " .. #GEAR_DATABASE)
+spawn(init)
+print("🌱 Grow A Garden 2 Hub siap!")
