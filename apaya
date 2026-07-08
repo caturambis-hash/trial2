@@ -1,6 +1,6 @@
 -- ============================================================
--- Grow A Garden 2 - Auto Gift Mail (Landscape UI)
--- Database item dari repository gag2-shop/assets
+-- Grow A Garden 2 - Auto Gift Mail (Fix)
+-- Menggunakan mekanisme dari: iyah.lua
 -- ============================================================
 
 local Players = game:GetService("Players")
@@ -15,121 +15,208 @@ local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
 local PlayerName = LocalPlayer.Name
 
 -- ============================================================
--- 1. DATABASE ITEM (dari repository gag2-shop/assets)
+-- 1. LOAD NETWORKING MODULES (seperti di iyah.lua)
 -- ============================================================
-local SEED_LIST = {
-    "acorn", "apple", "bamboo", "banana", "blueberry", "briar-rose", "cactus",
-    "carrot", "cherry", "coconut", "corn", "dragon-fruit", "dragons-breath",
-    "grape", "green-bean", "hypno-bloom", "mango", "moon-bloom", "mushroom",
-    "pineapple", "poison-apple", "pomegranate", "pumpkin", "strawberry",
-    "sunflower", "tomato", "tulip", "venom-spitter", "venus-fly-trap", "watermelon"
-}
+local SharedModules = ReplicatedStorage:FindFirstChild("SharedModules")
+local ClientModules = ReplicatedStorage:FindFirstChild("ClientModules")
 
-local PET_LIST = {
-    "bald-eagle", "bear", "bee", "big-bee", "black-dragon", "bunny", "butterfly",
-    "capybara", "cat", "chicken", "cow", "deer", "dog", "dolphin", "dragon",
-    "duck", "eagle", "elephant", "fish", "flamingo", "fox", "frog", "giraffe",
-    "goat", "goose", "hamster", "hedgehog", "horse", "kangaroo", "koala",
-    "lion", "llama", "monkey", "moose", "mouse", "octopus", "owl", "panda",
-    "parrot", "peacock", "penguin", "pig", "pigeon", "polar-bear", "pony",
-    "rabbit", "raccoon", "rat", "rhino", "rooster", "seahorse", "sheep",
-    "shrimp", "skunk", "sloth", "snail", "snake", "spider", "squirrel",
-    "swan", "tiger", "toad", "tortoise", "turkey", "turtle", "unicorn",
-    "walrus", "whale", "wolf", "zebra"
-}
+local Networking = nil
+local PlayerStateClient = nil
+local MailboxItemCatalog = nil
 
-local GEAR_LIST = {
-    "Common Watering Can","Common Sprinkler","Uncommon Sprinkler","Rare Sprinkler",
-    "Legendary Sprinkler","Super Watering Can","Super Sprinkler",
-    "Jump Mushroom","Speed Mushroom","Shrink Mushroom","Supersize Mushroom",
-    "Invisibility Mushroom","Trowel","Sign","Lantern","Megaphone",
-    "Gnome","Flashbang","Basic Pot","Teleporter","Wheelbarrow",
-    "Strawberry Sniper","Player Magnet"
-}
-
-local CROP_LIST = {
-    "Apple","Banana","Orange","Grape","Watermelon","Strawberry","Tomato","Corn"
-}
-
-local function formatItemName(raw)
-    local name = raw:gsub("-", " "):gsub("^%l", string.upper)
-    name = name:gsub("(%s)(%l)", function(space, letter) return space .. string.upper(letter) end)
-    return name
-end
-
--- Buat database dengan format yang sudah diformat
-local ITEM_DB = {
-    Seeds = {},
-    Pets = {},
-    Gear = {},
-    Crops = {},
-}
-
-for _, raw in ipairs(SEED_LIST) do
-    table.insert(ITEM_DB.Seeds, formatItemName(raw))
-end
-for _, raw in ipairs(PET_LIST) do
-    table.insert(ITEM_DB.Pets, formatItemName(raw))
-end
-for _, name in ipairs(GEAR_LIST) do
-    table.insert(ITEM_DB.Gear, name)
-end
-for _, name in ipairs(CROP_LIST) do
-    table.insert(ITEM_DB.Crops, name)
-end
-
--- ============================================================
--- 2. REMOTE EVENT & NETWORKING
--- ============================================================
-local RemoteEvent = nil
-local function getRemote()
-    if not RemoteEvent then
-        local possible = {
-            ReplicatedStorage:FindFirstChild("RemoteEvent"),
-            ReplicatedStorage:FindFirstChild("SharedModules") and ReplicatedStorage.SharedModules:FindFirstChild("Packet") and ReplicatedStorage.SharedModules.Packet:FindFirstChild("RemoteEvent"),
-            ReplicatedStorage:FindFirstChild("Packet") and ReplicatedStorage.Packet:FindFirstChild("RemoteEvent"),
-        }
-        for _, p in ipairs(possible) do
-            if p then RemoteEvent = p; break end
-        end
-    end
-    return RemoteEvent
-end
-
-local function lookupRecipient(username)
-    username = tostring(username or ""):lower():gsub("^%s*(.-)%s*$", "%1")
-    if username == "" then return nil end
-    local remote = getRemote()
-    if remote then
-        local ok, res = pcall(function() return remote:InvokeServer("LookupPlayer", username) end)
-        if ok and type(res) == "number" and res > 0 then return res end
-    end
-    local ok, id = pcall(Players.GetUserIdFromNameAsync, Players, username)
-    if ok and type(id) == "number" and id > 0 then return id end
+local function safeRequire(module)
+    if not module then return nil end
+    local ok, result = pcall(require, module)
+    if ok then return result end
     return nil
 end
 
-local function sendMailBatch(userId, payload, note)
-    local remote = getRemote()
-    if not remote then return false, "Remote not found" end
-    local ok, res, msg = pcall(function()
-        return remote:InvokeServer("SendBatch", userId, payload, tostring(note or ""))
+local function loadNetworkingModules()
+    if SharedModules then
+        Networking = safeRequire(SharedModules:FindFirstChild("Networking"))
+    end
+    if ClientModules then
+        PlayerStateClient = safeRequire(ClientModules:FindFirstChild("PlayerStateClient"))
+    end
+end
+loadNetworkingModules()
+
+-- ============================================================
+-- 2. DATABASE ITEM (dari iyah.lua)
+-- ============================================================
+local SEED_DATABASE = {
+    "Tulip", "Tomato", "Apple", "Bamboo", "Corn", "Cactus", "Pineapple", "Mushroom",
+    "Green Bean", "Banana", "Grape", "Coconut", "Mango", "Dragon Fruit", "Acorn",
+    "Cherry", "Sunflower", "Venus Fly Trap", "Pomegranate", "Poison Apple",
+    "Venom Spitter", "Moon Bloom", "Hypno Bloom", "Dragon's Breath"
+}
+
+local PET_DATABASE = {
+    "Big Rainbow Raccoon", "Mega Rainbow Bee", "Mega Rainbow Robin", "Mega Rainbow Turtle",
+    "Mega Rainbow Unicorn", "Mega Raccoon", "Mega Golden Dragonfly", "Mega Bear",
+    "Mega Rainbow Frog", "Mega Unicorn", "Rainbow Bear", "Mega Rainbow Deer",
+    "Mega Rainbow Bunny", "Big Rainbow Robin", "Rainbow Monkey", "Big Rainbow Bee",
+    "Rainbow Raccoon", "Mega Black Dragon", "Big Rainbow Black Dragon", "Mega Rainbow Black Dragon",
+    "Big Rainbow Turtle", "Rainbow Unicorn", "Mega Rainbow Ice Serpent", "Big Raccoon",
+    "Mega Ice Serpent", "Big Rainbow Owl", "Rainbow Golden Dragonfly", "Big Rainbow Ice Serpent",
+    "Big Bear", "Big Monkey", "Big Rainbow Deer"
+}
+
+local GEAR_DATABASE = {
+    "Common Watering Can", "Common Sprinkler", "Sign", "Uncommon Sprinkler", "Trowel",
+    "Rare Sprinkler", "Jump Mushroom", "Speed Mushroom", "Lantern", "Megaphone",
+    "Shrink Mushroom", "Supersize Mushroom", "Gnome", "Flashbang", "Basic Pot",
+    "Legendary Sprinkler", "Invisibility Mushroom", "Teleporter", "Wheelbarrow",
+    "Strawberry Sniper", "Player Magnet", "Super Watering Can", "Super Sprinkler"
+}
+
+local ITEM_DB = {
+    Seeds = SEED_DATABASE,
+    Pets = PET_DATABASE,
+    Gear = GEAR_DATABASE,
+}
+
+-- ============================================================
+-- 3. FUNGSI INVENTORY (dari PlayerStateClient)
+-- ============================================================
+local function getLocalInventory()
+    if not PlayerStateClient or type(PlayerStateClient.GetLocalReplica) ~= "function" then
+        return nil
+    end
+    local ok, replica = pcall(function()
+        return PlayerStateClient:GetLocalReplica()
     end)
-    if not ok then return false, tostring(res) end
-    if res == true then return true, tostring(msg or "Sent") end
-    return false, tostring(msg or "Failed")
+    if not ok or type(replica) ~= "table" then return nil end
+    local data = replica.Data
+    if type(data) ~= "table" or type(data.Inventory) ~= "table" then return nil end
+    return data.Inventory
 end
 
-local function buildPayload(selectedItems)
-    local payload = {}
-    for _, item in ipairs(selectedItems) do
-        table.insert(payload, { Category = item.Category, ItemKey = item.ItemKey, Count = 1 })
+local function collectInventoryEntries()
+    local inventory = getLocalInventory()
+    if not inventory then return {} end
+    local entries = {}
+    for cat, data in pairs(inventory) do
+        if cat == "Pets" then
+            for key, val in pairs(data) do
+                if val and val.Id and not val.Equipped then
+                    table.insert(entries, {
+                        DisplayName = val.Name or key,
+                        ItemKey = key,
+                        Category = "Pets",
+                        Quantity = 1
+                    })
+                end
+            end
+        elseif cat == "Seeds" or cat == "Gear" then
+            for key, qty in pairs(data) do
+                if qty > 0 then
+                    table.insert(entries, {
+                        DisplayName = key,
+                        ItemKey = key,
+                        Category = cat,
+                        Quantity = qty
+                    })
+                end
+            end
+        end
     end
-    return payload
+    return entries
 end
 
 -- ============================================================
--- 3. NOTIFIKASI
+-- 4. FUNGSI GIFT (Sama seperti iyah.lua)
+-- ============================================================
+local function normalizeUsername(value)
+    local username = tostring(value or "")
+    username = username:gsub("^%s*@?(.-)%s*$", "%1")
+    return username
+end
+
+local function lookupRecipient(username)
+    username = normalizeUsername(username)
+    if username == "" then return nil end
+
+    if Networking and Networking.Mailbox and Networking.Mailbox.LookupPlayer then
+        local ok, result = pcall(function()
+            return Networking.Mailbox.LookupPlayer:Fire(username)
+        end)
+        if ok and typeof(result) == "number" and result > 0 then
+            return result
+        end
+    end
+
+    local ok, userId = pcall(function()
+        return Players:GetUserIdFromNameAsync(username)
+    end)
+    if ok and type(userId) == "number" and userId > 0 then
+        return userId
+    end
+    return nil
+end
+
+local lastSendAt = 0
+local function sendBatch(userId, payload, note)
+    if not Networking or not Networking.Mailbox or not Networking.Mailbox.SendBatch then
+        return false, "Networking.Mailbox.SendBatch not found"
+    end
+
+    local elapsed = os.clock() - lastSendAt
+    if elapsed < 1.55 then
+        task.wait(1.55 - elapsed)
+    end
+    lastSendAt = os.clock()
+
+    local safeNote = tostring(note or "")
+    local noteLength = utf8.len(safeNote)
+    if noteLength and noteLength > 100 then
+        local cut = utf8.offset(safeNote, 101)
+        if cut then
+            safeNote = string.sub(safeNote, 1, cut - 1)
+        end
+    end
+
+    local ok, result, message = pcall(function()
+        return Networking.Mailbox.SendBatch:Fire(userId, payload, safeNote)
+    end)
+
+    if not ok then
+        return false, "Remote error: " .. tostring(result)
+    end
+
+    if result == true then
+        local text = tostring(message or "")
+        return true, text ~= "" and text or "Gift sent"
+    end
+
+    local text = tostring(message or "")
+    return false, text ~= "" and text or "Server rejected the gift"
+end
+
+local function buildPayloadFromSelection(selectedItems, maxQty)
+    local payload = {}
+    local sent = 0
+    for _, item in ipairs(selectedItems) do
+        if sent >= maxQty then break end
+        local count = math.min(item.qty or 1, maxQty - sent)
+        local category = item.inventoryCategory or item.category
+        local itemKey = item.key or item.name
+        if category == "Pets" then
+            for i = 1, count do
+                if sent >= maxQty then break end
+                table.insert(payload, { Category = category, ItemKey = itemKey, Count = 1 })
+                sent = sent + 1
+            end
+        else
+            table.insert(payload, { Category = category, ItemKey = itemKey, Count = count })
+            sent = sent + count
+        end
+    end
+    return payload, sent
+end
+
+-- ============================================================
+-- 5. NOTIFIKASI
 -- ============================================================
 local function notify(text, sub, dur)
     dur = dur or 2.5
@@ -182,7 +269,7 @@ local function notify(text, sub, dur)
 end
 
 -- ============================================================
--- 4. UI HELPERS
+-- 6. UI HELPERS
 -- ============================================================
 local function createButton(parent, text, color, callback)
     local btn = Instance.new("TextButton")
@@ -281,7 +368,7 @@ local function createToggle(parent, label, default, callback)
 end
 
 -- ============================================================
--- 5. BUILD GIFT PANEL (Landscape)
+-- 7. BUILD GIFT PANEL
 -- ============================================================
 local function buildGiftPanel(panel)
     -- State
@@ -289,26 +376,52 @@ local function buildGiftPanel(panel)
     local currentCategory = "Seeds"
     local searchQuery = ""
     local autoGiftEnabled = false
+    local isRefreshing = false
 
-    -- Buat semua item dari database (fallback)
-    local function buildItemList()
+    -- Fungsi refresh inventory dari PlayerStateClient
+    local function refreshInventory()
+        if isRefreshing then return end
+        isRefreshing = true
+
+        local entries = collectInventoryEntries()
         allItems = {}
-        for cat, list in pairs(ITEM_DB) do
-            for _, name in ipairs(list) do
-                table.insert(allItems, {
-                    DisplayName = name,
-                    ItemKey = name,
-                    Category = cat,
-                    Quantity = 1,
-                    selected = false,
-                })
+
+        if #entries > 0 then
+            -- Dari PlayerStateClient
+            for _, entry in ipairs(entries) do
+                local cat = entry.Category
+                if cat == "Seeds" or cat == "Gear" or cat == "Pets" then
+                    table.insert(allItems, {
+                        DisplayName = entry.DisplayName,
+                        ItemKey = entry.ItemKey,
+                        Category = cat,
+                        Quantity = entry.Quantity,
+                        selected = false,
+                    })
+                end
+            end
+        else
+            -- Fallback ke database jika inventory tidak terbaca
+            for cat, list in pairs(ITEM_DB) do
+                for _, name in ipairs(list) do
+                    table.insert(allItems, {
+                        DisplayName = name,
+                        ItemKey = name,
+                        Category = cat,
+                        Quantity = 1,
+                        selected = false,
+                    })
+                end
             end
         end
+
+        updateItemList()
+        isRefreshing = false
+        return #entries
     end
-    buildItemList()
 
     -- ============================================================
-    -- UI ELEMENTS (Landscape: dua kolom)
+    -- UI ELEMENTS
     -- ============================================================
 
     -- Baris 1: Username & Qty
@@ -340,15 +453,19 @@ local function buildGiftPanel(panel)
     qtyBox.TextSize = 12
     qtyBox.Parent = row1
 
-    -- Baris 2: Tombol Sync, Select All, Clear, Send
+    -- Baris 2: Tombol
     local row2 = Instance.new("Frame")
     row2.BackgroundTransparency = 1
     row2.Size = UDim2.new(1,0,0,30)
     row2.Parent = panel
 
     local syncBtn = createButton(row2, "🔄 Sync", Color3.fromRGB(50,50,70), function()
-        notify("🔄 Synced", "Inventory updated", 1)
-        -- Refresh item list (tidak perlu reload karena sudah ada)
+        local count = refreshInventory()
+        if count > 0 then
+            notify("🔄 Synced", count .. " items from inventory", 1.5)
+        else
+            notify("⚠️ Fallback", "Using database items", 1.5)
+        end
     end)
     syncBtn.Size = UDim2.new(0.23,0,0,24)
 
@@ -375,43 +492,70 @@ local function buildGiftPanel(panel)
     local sendBtn = createButton(row2, "📤 Send", Color3.fromRGB(75,125,180), function()
         local recipient = userBox.Text
         if recipient == "" then notify("⚠ Error", "Username kosong", 2) return end
+
         local selected = {}
         for _, item in ipairs(allItems) do
             if item.selected then
-                table.insert(selected, { Category = item.Category, ItemKey = item.ItemKey })
+                table.insert(selected, {
+                    name = item.ItemKey,
+                    key = item.ItemKey,
+                    category = item.Category,
+                    inventoryCategory = item.Category,
+                    qty = 1
+                })
             end
         end
-        if #selected == 0 then notify("⚠ Error", "Tidak ada item dipilih", 2) return end
+
+        if #selected == 0 then
+            notify("⚠ Error", "Tidak ada item dipilih", 2)
+            return
+        end
+
         local userId = lookupRecipient(recipient)
-        if not userId then notify("⚠ Error", "User tidak ditemukan", 2) return end
-        local payload = buildPayload(selected)
-        local ok, msg = sendMailBatch(userId, payload, "")
-        if ok then
-            notify("✅ Sent", #selected .. " items to " .. recipient, 2.5)
+        if not userId then
+            notify("⚠ Error", "User tidak ditemukan", 2)
+            return
+        end
+
+        if userId == LocalPlayer.UserId then
+            notify("⚠ Error", "Tidak bisa kirim ke diri sendiri", 2)
+            return
+        end
+
+        local maxQty = tonumber(qtyBox.Text) or 20
+        local payload, sentCount = buildPayloadFromSelection(selected, maxQty)
+
+        if sentCount == 0 or #payload == 0 then
+            notify("⚠ Error", "Tidak ada payload valid", 2)
+            return
+        end
+
+        local ok, message = sendBatch(userId, payload, "")
+        if not ok then
+            notify("❌ Failed", message, 2.5)
         else
-            notify("❌ Failed", msg, 2.5)
+            notify("✅ Sent", sentCount .. " items to " .. recipient, 2.5)
         end
     end)
     sendBtn.Size = UDim2.new(0.23,0,0,24)
 
-    -- Baris 3: Category tabs + Search (dalam satu baris)
+    -- Baris 3: Category tabs + Search
     local row3 = Instance.new("Frame")
     row3.BackgroundTransparency = 1
     row3.Size = UDim2.new(1,0,0,30)
     row3.Parent = panel
 
-    -- Category tabs (kiri)
     local catFrame = Instance.new("Frame")
     catFrame.BackgroundTransparency = 1
     catFrame.Size = UDim2.new(0.6,0,1,0)
     catFrame.Parent = row3
 
-    local categories = {"Seeds", "Gear", "Crops", "Pets"}
+    local categories = {"Seeds", "Gear", "Pets"}
     local catBtns = {}
     for i, cat in ipairs(categories) do
         local btn = Instance.new("TextButton")
-        btn.Size = UDim2.new(0.23,0,0,22)
-        btn.Position = UDim2.new((i-1)*0.25,0,0,0)
+        btn.Size = UDim2.new(0.3,0,0,22)
+        btn.Position = UDim2.new((i-1)*0.33,0,0,0)
         btn.BackgroundColor3 = (i==1) and Color3.fromRGB(88,136,186) or Color3.fromRGB(50,50,56)
         btn.TextColor3 = Color3.fromRGB(240,240,240)
         btn.Text = cat
@@ -428,7 +572,6 @@ local function buildGiftPanel(panel)
         table.insert(catBtns, btn)
     end
 
-    -- Search bar (kanan)
     local searchBox = Instance.new("TextBox")
     searchBox.Size = UDim2.new(0.35,0,1,0)
     searchBox.Position = UDim2.new(0.62,0,0,0)
@@ -444,7 +587,7 @@ local function buildGiftPanel(panel)
         updateItemList()
     end)
 
-    -- Item list (memanjang)
+    -- Item list
     local itemFrame = Instance.new("ScrollingFrame")
     itemFrame.BackgroundColor3 = Color3.fromRGB(38,38,38)
     itemFrame.BorderSizePixel = 0
@@ -466,17 +609,28 @@ local function buildGiftPanel(panel)
                 while autoGiftEnabled do
                     local recipient = userBox.Text
                     if recipient == "" then break end
+
                     local selected = {}
                     for _, item in ipairs(allItems) do
                         if item.selected then
-                            table.insert(selected, { Category = item.Category, ItemKey = item.ItemKey })
+                            table.insert(selected, {
+                                name = item.ItemKey,
+                                key = item.ItemKey,
+                                category = item.Category,
+                                inventoryCategory = item.Category,
+                                qty = 1
+                            })
                         end
                     end
+
                     if #selected > 0 then
                         local userId = lookupRecipient(recipient)
-                        if userId then
-                            local payload = buildPayload(selected)
-                            sendMailBatch(userId, payload, "")
+                        if userId and userId ~= LocalPlayer.UserId then
+                            local maxQty = tonumber(qtyBox.Text) or 20
+                            local payload, sentCount = buildPayloadFromSelection(selected, maxQty)
+                            if sentCount > 0 then
+                                sendBatch(userId, payload, "")
+                            end
                         end
                     end
                     task.wait(3)
@@ -498,6 +652,7 @@ local function buildGiftPanel(panel)
         local query = searchQuery
         local cat = currentCategory
         local count = 0
+
         for _, item in ipairs(allItems) do
             if item.Category == cat then
                 local nameLower = tostring(item.DisplayName):lower()
@@ -518,7 +673,9 @@ local function buildGiftPanel(panel)
                 end
             end
         end
+
         itemFrame.CanvasSize = UDim2.new(0,0,0, itemLayout.AbsoluteContentSize.Y + 10)
+
         if count == 0 then
             local empty = Instance.new("TextLabel")
             empty.BackgroundTransparency = 1
@@ -531,11 +688,28 @@ local function buildGiftPanel(panel)
         end
     end
 
-    updateItemList()
+    -- Initial load
+    refreshInventory()
+
+    -- REAL-TIME SYNC (setiap 0.01 detik)
+    task.spawn(function()
+        while true do
+            if not panel or not panel.Parent then break end
+            refreshInventory()
+            task.wait(0.01)
+        end
+    end)
+
+    -- Update canvas size
+    local function updateCanvas()
+        panel.CanvasSize = UDim2.new(0,0,0, itemLayout.AbsoluteContentSize.Y + 300)
+    end
+    itemLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(updateCanvas)
+    updateCanvas()
 end
 
 -- ============================================================
--- 6. BUILD UI UTAMA (LANDSCAPE)
+-- 8. BUILD UI UTAMA
 -- ============================================================
 local function buildUI()
     local old = PlayerGui:FindFirstChild("HubGUI")
@@ -546,10 +720,10 @@ local function buildUI()
     screen.IgnoreGuiInset = true
     screen.Parent = PlayerGui
 
-    -- Main frame (landscape: width 560, height 400)
+    -- Main frame (landscape)
     local mainFrame = Instance.new("Frame")
-    mainFrame.Size = UDim2.new(0, 560, 0, 400)
-    mainFrame.Position = UDim2.new(0.5, -280, 0.2, 0)
+    mainFrame.Size = UDim2.new(0, 560, 0, 420)
+    mainFrame.Position = UDim2.new(0.5, -280, 0.15, 0)
     mainFrame.BackgroundColor3 = Color3.fromRGB(20,18,28)
     mainFrame.BorderSizePixel = 0
     mainFrame.Active = true
@@ -574,34 +748,29 @@ local function buildUI()
     titleLabel.Size = UDim2.new(1,0,1,0)
     titleLabel.Parent = titleBar
 
-    -- Content area (full, tanpa sidebar)
+    -- Content
     local content = Instance.new("Frame")
     content.BackgroundTransparency = 1
-    content.Size = UDim2.new(1, 0, 1, -30)
-    content.Position = UDim2.new(0, 0, 0, 30)
+    content.Size = UDim2.new(1,0,1,-30)
+    content.Position = UDim2.new(0,0,0,30)
     content.Parent = mainFrame
 
-    -- Panel
     local panel = Instance.new("ScrollingFrame")
     panel.BackgroundColor3 = Color3.fromRGB(38,38,38)
     panel.BorderSizePixel = 0
-    panel.Size = UDim2.new(1, 0, 1, 0)
+    panel.Size = UDim2.new(1,0,1,0)
     panel.ScrollBarThickness = 4
     panel.Parent = content
 
     local layout = Instance.new("UIListLayout")
-    layout.Padding = UDim.new(0, 6)
+    layout.Padding = UDim.new(0,6)
     layout.SortOrder = Enum.SortOrder.LayoutOrder
     layout.Parent = panel
 
-    -- Build Gift Panel
     buildGiftPanel(panel)
 
-    -- Update canvas
-    panel.CanvasSize = UDim2.new(0,0,0, layout.AbsoluteContentSize.Y + 20)
-
     -- ============================================================
-    -- DRAG (menggunakan titleBar)
+    -- DRAG
     -- ============================================================
     local dragging = false
     local dragStart, frameStart
@@ -632,24 +801,29 @@ local function buildUI()
     -- Animate in
     mainFrame.BackgroundTransparency = 1
     TweenService:Create(mainFrame, TweenInfo.new(0.2), { BackgroundTransparency = 0 }):Play()
-    mainFrame.Position = UDim2.new(0.5, -280, 0.2, 30)
+    mainFrame.Position = UDim2.new(0.5, -280, 0.15, 30)
     TweenService:Create(mainFrame, TweenInfo.new(0.3, Enum.EasingStyle.Back), {
-        Position = UDim2.new(0.5, -280, 0.2, 0)
+        Position = UDim2.new(0.5, -280, 0.15, 0)
     }):Play()
 
     return screen
 end
 
 -- ============================================================
--- 7. START
+-- 9. START
 -- ============================================================
 local function init()
     if PlayerGui:GetAttribute("HubInitialized") then return end
     PlayerGui:SetAttribute("HubInitialized", true)
+
+    if not Networking or not Networking.Mailbox then
+        notify("⚠️ Warning", "Networking.Mailbox not found - gift may not work", 3)
+    end
+
     notify("📨 Gift Panel", "Welcome " .. PlayerName, 2)
     delay(0.5, function() pcall(buildUI) end)
 end
 
 spawn(init)
-print("📨 Auto Gift Mail - Landscape UI loaded!")
-print("🌱 Seeds: " .. #ITEM_DB.Seeds .. ", Pets: " .. #ITEM_DB.Pets)
+print("📨 Auto Gift Mail - Fixed version loaded!")
+print("✅ Using Networking.Mailbox.SendBatch:Fire() for gift")
