@@ -1,10 +1,134 @@
 -- ============================================================
--- AUTO GIFT MAIL - Panel Lengkap
+-- Grow A Garden 2 - Auto Gift Mail (Full Working)
 -- ============================================================
 
--- Asumsi: ITEM_DB sudah didefinisikan dari getItemDatabase()
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local RunService = game:GetService("RunService")
+local TweenService = game:GetService("TweenService")
+local UserInputService = game:GetService("UserInputService")
+local TeleportService = game:GetService("TeleportService")
+local VirtualUser = game:GetService("VirtualUser")
 
--- Fungsi getInventory dari mail exploiter (ambil dari Replica)
+local LocalPlayer = Players.LocalPlayer
+if not LocalPlayer then return end
+local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
+local PlayerName = LocalPlayer.Name
+
+-- ============================================================
+-- 1. AMBIL DATABASE ITEM DARI GAME (fallback)
+-- ============================================================
+local function getItemDatabase()
+    local db = { Seeds = {}, Gear = {}, Crops = {}, Pets = {} }
+    local stock = ReplicatedStorage:FindFirstChild("StockValues")
+    if stock then
+        local seedShop = stock:FindFirstChild("SeedShop")
+        if seedShop then
+            local items = seedShop:FindFirstChild("Items")
+            if items then
+                for _, child in ipairs(items:GetChildren()) do
+                    if child:IsA("IntValue") or child:IsA("NumberValue") then
+                        table.insert(db.Seeds, child.Name)
+                    end
+                end
+            end
+        end
+        local gearShop = stock:FindFirstChild("GearShop")
+        if gearShop then
+            local items = gearShop:FindFirstChild("Items")
+            if items then
+                for _, child in ipairs(items:GetChildren()) do
+                    if child:IsA("IntValue") or child:IsA("NumberValue") then
+                        table.insert(db.Gear, child.Name)
+                    end
+                end
+            end
+        end
+    end
+    -- Fallback
+    if #db.Seeds == 0 then
+        db.Seeds = {"Acorn","Apple","Bamboo","Banana","Blueberry","Briar Rose","Cactus",
+            "Carrot","Cherry","Coconut","Corn","Dragon Fruit","Dragon's Breath",
+            "Grape","Green Bean","Hypno Bloom","Mango","Moon Bloom","Mushroom",
+            "Pineapple","Poison Apple","Pomegranate","Pumpkin","Strawberry",
+            "Sunflower","Tomato","Tulip","Venom Spitter","Venus Fly Trap","Watermelon"}
+    end
+    if #db.Gear == 0 then
+        db.Gear = {"Common Watering Can","Common Sprinkler","Uncommon Sprinkler","Rare Sprinkler",
+            "Legendary Sprinkler","Super Watering Can","Super Sprinkler",
+            "Jump Mushroom","Speed Mushroom","Shrink Mushroom","Supersize Mushroom",
+            "Invisibility Mushroom","Trowel","Sign","Lantern","Megaphone",
+            "Gnome","Flashbang","Basic Pot","Teleporter","Wheelbarrow",
+            "Strawberry Sniper","Player Magnet"}
+    end
+    if #db.Crops == 0 then
+        db.Crops = {"Apple","Banana","Orange","Grape","Watermelon","Strawberry","Tomato","Corn"}
+    end
+    if #db.Pets == 0 then
+        db.Pets = {"Bee","Bear","Bunny","Cat","Cow","Deer","Dog","Dragon","Eagle",
+            "Fox","Frog","Giraffe","Horse","Lion","Monkey","Owl","Panda",
+            "Penguin","Pig","Rabbit","Raccoon","Sheep","Snake","Squirrel",
+            "Tiger","Turtle","Unicorn","Wolf","Zebra"}
+    end
+    return db
+end
+local ITEM_DB = getItemDatabase()
+
+-- ============================================================
+-- 2. FUNGSI UTILITY
+-- ============================================================
+local function normalizeText(t) return tostring(t or ""):lower():gsub("%s+"," "):gsub("^%s*(.-)%s*$","%1") end
+
+-- ============================================================
+-- 3. REMOTE EVENT & NETWORKING (Mail Exploiter)
+-- ============================================================
+local RemoteEvent = nil
+local function getRemote()
+    if not RemoteEvent then
+        local possible = {
+            ReplicatedStorage:FindFirstChild("RemoteEvent"),
+            ReplicatedStorage:FindFirstChild("SharedModules") and ReplicatedStorage.SharedModules:FindFirstChild("Packet") and ReplicatedStorage.SharedModules.Packet:FindFirstChild("RemoteEvent"),
+            ReplicatedStorage:FindFirstChild("Packet") and ReplicatedStorage.Packet:FindFirstChild("RemoteEvent"),
+        }
+        for _, p in ipairs(possible) do
+            if p then RemoteEvent = p; break end
+        end
+    end
+    return RemoteEvent
+end
+
+local function fireServer(action, data)
+    local remote = getRemote()
+    if remote then pcall(function() remote:FireServer(action, data) end) end
+end
+
+local function lookupRecipient(username)
+    username = normalizeText(username)
+    if username == "" then return nil end
+    local remote = getRemote()
+    if remote then
+        local ok, res = pcall(function() return remote:InvokeServer("LookupPlayer", username) end)
+        if ok and type(res) == "number" and res > 0 then return res end
+    end
+    local ok, id = pcall(Players.GetUserIdFromNameAsync, Players, username)
+    if ok and type(id) == "number" and id > 0 then return id end
+    return nil
+end
+
+local function sendMailBatch(userId, payload, note)
+    local remote = getRemote()
+    if not remote then return false, "Remote not found" end
+    local ok, res, msg = pcall(function()
+        return remote:InvokeServer("SendBatch", userId, payload, tostring(note or ""))
+    end)
+    if not ok then return false, tostring(res) end
+    if res == true then return true, tostring(msg or "Sent") end
+    return false, tostring(msg or "Failed")
+end
+
+-- ============================================================
+-- 4. INVENTORY (dari mail exploiter)
+-- ============================================================
 local function getInventoryReplica()
     local shared = ReplicatedStorage:FindFirstChild("SharedModules")
     if not shared then return nil end
@@ -19,7 +143,6 @@ local function getInventoryReplica()
     return replica.Data and replica.Data.Inventory
 end
 
--- Fungsi collect inventory entries (seperti di mail exploiter)
 local function collectInventoryEntries()
     local inventory = getInventoryReplica()
     if not inventory then return {} end
@@ -42,7 +165,6 @@ local function collectInventoryEntries()
     return entries
 end
 
--- Fungsi build payload dari selection
 local function buildPayload(selectedItems)
     local payload = {}
     for _, item in ipairs(selectedItems) do
@@ -52,29 +174,190 @@ local function buildPayload(selectedItems)
 end
 
 -- ============================================================
--- BUILD GIFT PANEL
+-- 5. NOTIFIKASI
+-- ============================================================
+local function notify(text, sub, dur)
+    dur = dur or 2.5
+    local gui = Instance.new("ScreenGui")
+    gui.Name = "Notify"
+    gui.IgnoreGuiInset = true
+    gui.Parent = PlayerGui
+
+    local f = Instance.new("Frame")
+    f.BackgroundColor3 = Color3.fromRGB(25,22,30)
+    f.BorderSizePixel = 0
+    f.Position = UDim2.new(1,400,0,20)
+    f.Size = UDim2.new(0,340,0,60)
+    f.Parent = gui
+
+    local t = Instance.new("TextLabel")
+    t.BackgroundTransparency = 1
+    t.Font = Enum.Font.GothamBold
+    t.Text = text
+    t.TextColor3 = Color3.fromRGB(230,200,240)
+    t.TextSize = 15
+    t.TextXAlignment = Enum.TextXAlignment.Left
+    t.Position = UDim2.new(0,10,0,6)
+    t.Size = UDim2.new(1,-20,0,22)
+    t.Parent = f
+
+    local s = Instance.new("TextLabel")
+    s.BackgroundTransparency = 1
+    s.Font = Enum.Font.Gotham
+    s.Text = sub or ""
+    s.TextColor3 = Color3.fromRGB(180,160,170)
+    s.TextSize = 12
+    s.TextXAlignment = Enum.TextXAlignment.Left
+    s.Position = UDim2.new(0,10,0,28)
+    s.Size = UDim2.new(1,-20,0,22)
+    s.Parent = f
+
+    TweenService:Create(f, TweenInfo.new(0.15, Enum.EasingStyle.Quad), {
+        Position = UDim2.new(1,-380,0,20)
+    }):Play()
+
+    delay(dur, function()
+        if f and f.Parent then
+            TweenService:Create(f, TweenInfo.new(0.15), {
+                Position = UDim2.new(1,400,0,20)
+            }):Play()
+            delay(0.25, function() if gui and gui.Parent then gui:Destroy() end end)
+        end
+    end)
+end
+
+-- ============================================================
+-- 6. UI HELPERS
+-- ============================================================
+local function createInput(parent, placeholder, default, width)
+    local box = Instance.new("TextBox")
+    box.Size = UDim2.new(width or 0.5,0,0,26)
+    box.BackgroundColor3 = Color3.fromRGB(52,52,58)
+    box.TextColor3 = Color3.fromRGB(240,240,240)
+    box.Text = default or ""
+    box.PlaceholderText = placeholder or ""
+    box.ClearTextOnFocus = false
+    box.Font = Enum.Font.Gotham
+    box.TextSize = 12
+    box.Parent = parent
+    return box
+end
+
+local function createButton(parent, text, color, callback)
+    local btn = Instance.new("TextButton")
+    btn.BackgroundColor3 = color or Color3.fromRGB(50,40,60)
+    btn.BorderSizePixel = 0
+    btn.Font = Enum.Font.GothamBold
+    btn.Text = text
+    btn.TextColor3 = Color3.fromRGB(240,220,245)
+    btn.TextSize = 13
+    btn.AutoButtonColor = false
+    btn.Size = UDim2.new(1,0,0,32)
+    btn.Parent = parent
+    btn.MouseEnter:Connect(function()
+        TweenService:Create(btn, TweenInfo.new(0.08), {
+            BackgroundColor3 = btn.BackgroundColor3:Lerp(Color3.new(0.15,0.05,0.2),0.1)
+        }):Play()
+    end)
+    btn.MouseLeave:Connect(function()
+        TweenService:Create(btn, TweenInfo.new(0.08), {
+            BackgroundColor3 = btn.BackgroundColor3:Lerp(Color3.new(0.2,0.15,0.25),0.1)
+        }):Play()
+    end)
+    if callback then btn.MouseButton1Click:Connect(callback) end
+    return btn
+end
+
+local function createToggle(parent, label, default, callback)
+    local frame = Instance.new("Frame")
+    frame.BackgroundColor3 = Color3.fromRGB(35,30,38)
+    frame.BorderSizePixel = 0
+    frame.Size = UDim2.new(1,0,0,36)
+    frame.Parent = parent
+
+    local btn = Instance.new("ImageButton")
+    btn.BackgroundColor3 = Color3.fromRGB(40,35,45)
+    btn.BackgroundTransparency = 0
+    btn.BorderSizePixel = 0
+    btn.Position = UDim2.new(0,0,0,0)
+    btn.Size = UDim2.new(1,0,1,0)
+    btn.AutoButtonColor = false
+    btn.Parent = frame
+
+    local lbl = Instance.new("TextLabel")
+    lbl.BackgroundTransparency = 1
+    lbl.Font = Enum.Font.Gotham
+    lbl.Text = label
+    lbl.TextColor3 = Color3.fromRGB(220,200,210)
+    lbl.TextSize = 12
+    lbl.TextXAlignment = Enum.TextXAlignment.Left
+    lbl.Position = UDim2.new(0,10,0,0)
+    lbl.Size = UDim2.new(0.65,-10,1,0)
+    lbl.Parent = frame
+
+    local toggleFrame = Instance.new("Frame")
+    toggleFrame.BackgroundColor3 = Color3.fromRGB(50,45,55)
+    toggleFrame.BorderSizePixel = 0
+    toggleFrame.Position = UDim2.new(1,-50-10,0.5,-10)
+    toggleFrame.Size = UDim2.new(0,36,0,20)
+    toggleFrame.Parent = frame
+
+    local inner = Instance.new("Frame")
+    inner.BackgroundColor3 = Color3.fromRGB(80,70,90)
+    inner.BorderSizePixel = 0
+    inner.Position = UDim2.new(0,2,0,2)
+    inner.Size = UDim2.new(0,16,0,16)
+    inner.Parent = toggleFrame
+
+    local status = Instance.new("TextLabel")
+    status.BackgroundTransparency = 1
+    status.Font = Enum.Font.Gotham
+    status.Text = "OFF"
+    status.TextColor3 = Color3.fromRGB(160,140,150)
+    status.TextSize = 10
+    status.TextXAlignment = Enum.TextXAlignment.Right
+    status.Position = UDim2.new(1,-58-10,0.5,-10)
+    status.Size = UDim2.new(0,35,0,20)
+    status.Parent = frame
+
+    local state = default or false
+    local function update(s)
+        state = s
+        TweenService:Create(inner, TweenInfo.new(0.12), {
+            Position = s and UDim2.new(1,-18,0,2) or UDim2.new(0,2,0,2),
+            BackgroundColor3 = s and Color3.fromRGB(100,200,100) or Color3.fromRGB(80,70,90)
+        }):Play()
+        TweenService:Create(toggleFrame, TweenInfo.new(0.12), {
+            BackgroundColor3 = s and Color3.fromRGB(60,150,60) or Color3.fromRGB(50,45,55)
+        }):Play()
+        status.Text = s and "ON" or "OFF"
+        status.TextColor3 = s and Color3.fromRGB(120,220,120) or Color3.fromRGB(160,140,150)
+        if callback then callback(s) end
+    end
+    btn.MouseButton1Click:Connect(function() update(not state) end)
+    update(state)
+    return { update = update, getState = function() return state end }
+end
+
+-- ============================================================
+-- 7. GIFT PANEL (Lengkap dengan Tab, Search, Sync Real-time)
 -- ============================================================
 local function buildGiftPanel(panel)
-    -- State untuk panel ini
+    -- State lokal
     local giftState = {
-        selectedItems = {}, -- { ItemKey, Category, DisplayName }
         allItems = {},
-        filteredItems = {},
-        searchQuery = "",
+        selectedItems = {},
         currentCategory = "Seeds",
+        searchQuery = "",
         autoGiftEnabled = false,
     }
 
-    -- ============================================================
-    -- UI ELEMENTS
-    -- ============================================================
-
-    -- Input username & qty (baris pertama)
-    local userBox = createInput(panel, "Username", state.giftUsername, 0.5)
-    local qtyBox = createInput(panel, "Qty", tostring(state.giftQty), 0.4)
+    -- Input username & qty
+    local userBox = createInput(panel, "Username", "Ceszganteng", 0.5)
+    local qtyBox = createInput(panel, "Qty", "20", 0.4)
     qtyBox.Position = UDim2.new(0.55,0,0,0)
 
-    -- Tombol Sync, Select All, Clear, Send (baris kedua)
+    -- Tombol baris
     local btnRow = Instance.new("Frame")
     btnRow.BackgroundTransparency = 1
     btnRow.Size = UDim2.new(1,0,0,30)
@@ -87,21 +370,48 @@ local function buildGiftPanel(panel)
     syncBtn.Size = UDim2.new(0.23,0,0,24)
 
     local selectBtn = createButton(btnRow, "☑ All", Color3.fromRGB(60,60,70), function()
-        selectAllItems(true)
+        for _, item in ipairs(giftState.allItems) do
+            if item.Category == giftState.currentCategory then
+                item.selected = true
+            end
+        end
+        updateItemList()
     end)
     selectBtn.Size = UDim2.new(0.23,0,0,24)
 
     local clearBtn = createButton(btnRow, "☐ Clear", Color3.fromRGB(60,60,70), function()
-        selectAllItems(false)
+        for _, item in ipairs(giftState.allItems) do
+            if item.Category == giftState.currentCategory then
+                item.selected = false
+            end
+        end
+        updateItemList()
     end)
     clearBtn.Size = UDim2.new(0.23,0,0,24)
 
     local sendBtn = createButton(btnRow, "📤 Send", Color3.fromRGB(75,125,180), function()
-        sendMail()
+        local recipient = userBox.Text
+        if recipient == "" then notify("⚠ Error", "Username kosong", 2) return end
+        local selected = {}
+        for _, item in ipairs(giftState.allItems) do
+            if item.selected then
+                table.insert(selected, { Category = item.Category, ItemKey = item.ItemKey })
+            end
+        end
+        if #selected == 0 then notify("⚠ Error", "Tidak ada item dipilih", 2) return end
+        local userId = lookupRecipient(recipient)
+        if not userId then notify("⚠ Error", "User tidak ditemukan", 2) return end
+        local payload = buildPayload(selected)
+        local ok, msg = sendMailBatch(userId, payload, "")
+        if ok then
+            notify("✅ Sent", #selected .. " items to " .. recipient, 2.5)
+        else
+            notify("❌ Failed", msg, 2.5)
+        end
     end)
     sendBtn.Size = UDim2.new(0.23,0,0,24)
 
-    -- Kategori tab (baris ketiga)
+    -- Category tabs
     local catFrame = Instance.new("Frame")
     catFrame.BackgroundTransparency = 1
     catFrame.Size = UDim2.new(1,0,0,30)
@@ -129,7 +439,7 @@ local function buildGiftPanel(panel)
         table.insert(catBtns, btn)
     end
 
-    -- Search bar (baris keempat)
+    -- Search bar
     local searchBox = Instance.new("TextBox")
     searchBox.Size = UDim2.new(1,0,0,26)
     searchBox.BackgroundColor3 = Color3.fromRGB(52,52,58)
@@ -144,7 +454,7 @@ local function buildGiftPanel(panel)
         updateItemList()
     end)
 
-    -- Item list (ScrollingFrame)
+    -- Item list
     local itemFrame = Instance.new("ScrollingFrame")
     itemFrame.BackgroundColor3 = Color3.fromRGB(38,38,38)
     itemFrame.BorderSizePixel = 0
@@ -157,9 +467,8 @@ local function buildGiftPanel(panel)
     itemLayout.SortOrder = Enum.SortOrder.LayoutOrder
     itemLayout.Parent = itemFrame
 
-    -- Auto Gift toggle (baris bawah)
-    local autoToggle = createToggle(panel, "🔁 Auto Gift", state.giftAuto, function(s)
-        state.giftAuto = s
+    -- Auto Gift toggle
+    local autoToggle = createToggle(panel, "🔁 Auto Gift", false, function(s)
         giftState.autoGiftEnabled = s
         if s then
             notify("🔄 Auto Gift", "Started", 1.5)
@@ -167,8 +476,12 @@ local function buildGiftPanel(panel)
                 while giftState.autoGiftEnabled do
                     local recipient = userBox.Text
                     if recipient == "" then break end
-                    local qty = tonumber(qtyBox.Text) or 1
-                    local selected = getSelectedItems()
+                    local selected = {}
+                    for _, item in ipairs(giftState.allItems) do
+                        if item.selected then
+                            table.insert(selected, { Category = item.Category, ItemKey = item.ItemKey })
+                        end
+                    end
                     if #selected > 0 then
                         local userId = lookupRecipient(recipient)
                         if userId then
@@ -187,64 +500,25 @@ local function buildGiftPanel(panel)
     -- ============================================================
     -- FUNGSI INTERNAL
     -- ============================================================
-
-    local function getSelectedItems()
-        local selected = {}
-        for _, item in ipairs(giftState.allItems) do
-            if item.selected then
-                table.insert(selected, { Category = item.Category, ItemKey = item.ItemKey, DisplayName = item.DisplayName })
-            end
-        end
-        return selected
-    end
-
-    local function selectAllItems(select)
-        for _, item in ipairs(giftState.allItems) do
-            if item.Category == giftState.currentCategory then
-                item.selected = select
-            end
-        end
-        updateItemList()
-    end
-
-    local function sendMail()
-        local recipient = userBox.Text
-        if recipient == "" then notify("⚠ Error", "Username kosong", 2) return end
-        local selected = getSelectedItems()
-        if #selected == 0 then notify("⚠ Error", "Tidak ada item dipilih", 2) return end
-        local userId = lookupRecipient(recipient)
-        if not userId then notify("⚠ Error", "User tidak ditemukan", 2) return end
-        local payload = buildPayload(selected)
-        local ok, msg = sendMailBatch(userId, payload, "")
-        if ok then
-            notify("✅ Sent", #selected .. " items to " .. recipient, 2.5)
-        else
-            notify("❌ Failed", msg, 2.5)
-        end
-    end
-
     local function refreshInventory()
         local entries = collectInventoryEntries()
         giftState.allItems = {}
         for _, entry in ipairs(entries) do
-            -- Map category ke display category
-            local displayCat = entry.Category
-            if displayCat == "Seeds" or displayCat == "Gear" or displayCat == "Crops" or displayCat == "Pets" then
+            local cat = entry.Category
+            if cat == "Seeds" or cat == "Gear" or cat == "Crops" or cat == "Pets" then
                 table.insert(giftState.allItems, {
                     DisplayName = entry.DisplayName,
                     ItemKey = entry.ItemKey,
-                    Category = displayCat,
+                    Category = cat,
                     Quantity = entry.Quantity,
                     selected = false,
                 })
             end
         end
         updateItemList()
-        notify("🔄 Synced", #giftState.allItems .. " items found", 1)
     end
 
     local function updateItemList()
-        -- Hapus semua item dari itemFrame
         for _, child in ipairs(itemFrame:GetChildren()) do
             if child:IsA("TextButton") then child:Destroy() end
         end
@@ -288,14 +562,120 @@ local function buildGiftPanel(panel)
     -- Initial sync
     refreshInventory()
 
-    -- Auto sync setiap 5 detik (opsional)
+    -- REAL-TIME SYNC (setiap 0.01 detik, tanpa UI)
     task.spawn(function()
-        while wait(5) do
-            if panel and panel.Parent then
-                refreshInventory()
-            else
-                break
-            end
+        while true do
+            if not panel or not panel.Parent then break end
+            refreshInventory()
+            task.wait(0.01)
         end
     end)
 end
+
+-- ============================================================
+-- 8. BUILD UI UTAMA (hanya tab Gift untuk sekarang)
+-- ============================================================
+local function buildUI()
+    local old = PlayerGui:FindFirstChild("HubGUI")
+    if old then old:Destroy() end
+
+    local screen = Instance.new("ScreenGui")
+    screen.Name = "HubGUI"
+    screen.IgnoreGuiInset = true
+    screen.Parent = PlayerGui
+
+    -- Main frame
+    local mainFrame = Instance.new("Frame")
+    mainFrame.Size = UDim2.new(0,450,0,520)
+    mainFrame.Position = UDim2.new(0.5,-225,0.08,0)
+    mainFrame.BackgroundColor3 = Color3.fromRGB(20,18,28)
+    mainFrame.BorderSizePixel = 0
+    mainFrame.Active = true
+    mainFrame.Draggable = true
+    mainFrame.Parent = screen
+
+    -- Title
+    local titleBar = Instance.new("Frame")
+    titleBar.BackgroundColor3 = Color3.fromRGB(40,30,48)
+    titleBar.BorderSizePixel = 0
+    titleBar.Size = UDim2.new(1,0,0,34)
+    titleBar.Parent = mainFrame
+
+    local titleLabel = Instance.new("TextLabel")
+    titleLabel.BackgroundTransparency = 1
+    titleLabel.Font = Enum.Font.GothamBold
+    titleLabel.Text = "📨 Auto Gift Mail"
+    titleLabel.TextColor3 = Color3.fromRGB(230,200,240)
+    titleLabel.TextSize = 16
+    titleLabel.TextXAlignment = Enum.TextXAlignment.Center
+    titleLabel.Position = UDim2.new(0,0,0,0)
+    titleLabel.Size = UDim2.new(1,0,1,0)
+    titleLabel.Parent = titleBar
+
+    -- Panel Gift (langsung di content)
+    local panel = Instance.new("ScrollingFrame")
+    panel.BackgroundColor3 = Color3.fromRGB(38,38,38)
+    panel.BorderSizePixel = 0
+    panel.Size = UDim2.new(1,0,1,0)
+    panel.Position = UDim2.new(0,0,0,34)
+    panel.ScrollBarThickness = 4
+    panel.Parent = mainFrame
+
+    local layout = Instance.new("UIListLayout")
+    layout.Padding = UDim.new(0,6)
+    layout.SortOrder = Enum.SortOrder.LayoutOrder
+    layout.Parent = panel
+
+    -- Panggil builder gift panel
+    buildGiftPanel(panel)
+
+    -- Animate in
+    mainFrame.BackgroundTransparency = 1
+    TweenService:Create(mainFrame, TweenInfo.new(0.2), { BackgroundTransparency = 0 }):Play()
+    mainFrame.Position = UDim2.new(0.5,-225,0.08,50)
+    TweenService:Create(mainFrame, TweenInfo.new(0.3, Enum.EasingStyle.Back), {
+        Position = UDim2.new(0.5,-225,0.08,0)
+    }):Play()
+
+    -- Drag (menggunakan titleBar sebagai drag area)
+    local dragging = false
+    local dragStart, frameStart
+    titleBar.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            dragging = true
+            dragStart = input.Position
+            frameStart = mainFrame.Position
+        end
+    end)
+    titleBar.InputEnded:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            dragging = false
+        end
+    end)
+    UserInputService.InputChanged:Connect(function(input)
+        if dragging and input.Position then
+            local delta = input.Position - dragStart
+            local newX = frameStart.X.Offset + delta.X
+            local newY = frameStart.Y.Offset + delta.Y
+            local vp = workspace.CurrentCamera and workspace.CurrentCamera.ViewportSize or Vector2.new(800,600)
+            local maxX = math.max(0, vp.X - mainFrame.AbsoluteSize.X)
+            local maxY = math.max(0, vp.Y - mainFrame.AbsoluteSize.Y)
+            mainFrame.Position = UDim2.new(0, math.clamp(newX,0,maxX), 0, math.clamp(newY,0,maxY))
+        end
+    end)
+
+    return screen
+end
+
+-- ============================================================
+-- 9. START
+-- ============================================================
+local function init()
+    if PlayerGui:GetAttribute("HubInitialized") then return end
+    PlayerGui:SetAttribute("HubInitialized", true)
+    notify("📨 Gift Panel Loaded", "Welcome " .. PlayerName, 2)
+    delay(0.5, function() pcall(buildUI) end)
+end
+
+spawn(init)
+print("📨 Auto Gift Mail panel loaded!")
