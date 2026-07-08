@@ -375,10 +375,11 @@ local settings = {
 }
 
 local SEED_DATABASE = {
-    "Tulip", "Tomato", "Apple", "Bamboo", "Corn", "Cactus", "Pineapple", "Mushroom",
-    "Green Bean", "Banana", "Grape", "Coconut", "Mango", "Dragon Fruit", "Acorn",
-    "Cherry", "Sunflower", "Venus Fly Trap", "Pomegranate", "Poison Apple",
-    "Venom Spitter", "Moon Bloom", "Hypno Bloom", "Dragon's Breath"
+    "Acorn", "Apple", "Bamboo", "Banana", "Blueberry", "Briar Rose", "Cactus",
+    "Carrot", "Cherry", "Coconut", "Corn", "Dragon Fruit", "Dragon's Breath",
+    "Grape", "Green Bean", "Hypno Bloom", "Mango", "Moon Bloom", "Mushroom",
+    "Pineapple", "Poison Apple", "Pomegranate", "Pumpkin", "Strawberry",
+    "Sunflower", "Tomato", "Tulip", "Venom Spitter", "Venus Fly Trap", "Watermelon"
 }
 
 local PET_DATABASE = {
@@ -398,6 +399,53 @@ local GEAR_DATABASE = {
     "Shrink Mushroom", "Supersize Mushroom", "Gnome", "Flashbang", "Basic Pot",
     "Legendary Sprinkler", "Invisibility Mushroom", "Teleporter", "Wheelbarrow",
     "Strawberry Sniper", "Player Magnet", "Super Watering Can", "Super Sprinkler"
+}
+
+local SEED_ASSET_ALIASES = {
+    Acorn = {"acorn"},
+    Apple = {"apple"},
+    Bamboo = {"bamboo"},
+    Banana = {"banana"},
+    ["Briar Rose"] = {"briar rose", "briar-rose", "briarrose"},
+    Cactus = {"cactus"},
+    Carrot = {"carrot"},
+    Cherry = {"cherry"},
+    Coconut = {"coconut"},
+    Corn = {"corn"},
+    ["Dragon Fruit"] = {"dragon fruit", "dragon-fruit", "dragonfruit"},
+    ["Dragon's Breath"] = {"dragon's breath", "dragons breath", "dragons-breath", "dragonsbreath"},
+    Grape = {"grape"},
+    ["Green Bean"] = {"green bean", "green-bean", "greenbean"},
+    ["Hypno Bloom"] = {"hypno bloom", "hypno-bloom", "hypnobloom"},
+    Mango = {"mango"},
+    ["Moon Bloom"] = {"moon bloom", "moon-bloom", "moonbloom"},
+    Mushroom = {"mushroom"},
+    Pineapple = {"pineapple"},
+    ["Poison Apple"] = {"poison apple", "poison-apple", "poisonapple"},
+    Pomegranate = {"pomegranate"},
+    Pumpkin = {"pumpkin"},
+    Strawberry = {"strawberry"},
+    Sunflower = {"sunflower"},
+    Tomato = {"tomato"},
+    Tulip = {"tulip"},
+    ["Venom Spitter"] = {"venom spitter", "venom-spitter", "venomspitter"},
+    ["Venus Fly Trap"] = {"venus fly trap", "venus-fly-trap", "venusflytrap"},
+    Watermelon = {"watermelon"},
+}
+
+local GEAR_ASSET_ALIASES = {
+    ["Common Watering Can"] = {"common watering can", "common-watering-can", "watering can", "watering-can"},
+    ["Common Sprinkler"] = {"common sprinkler", "common-sprinkler", "sprinkler"},
+    ["Uncommon Sprinkler"] = {"uncommon sprinkler", "uncommon-sprinkler"},
+    ["Rare Sprinkler"] = {"rare sprinkler", "rare-sprinkler"},
+    ["Legendary Sprinkler"] = {"legendary sprinkler", "legendary-sprinkler"},
+    ["Super Watering Can"] = {"super watering can", "super-watering-can"},
+    ["Super Sprinkler"] = {"super sprinkler", "super-sprinkler"},
+    ["Jump Mushroom"] = {"jump mushroom", "jump-mushroom"},
+    ["Speed Mushroom"] = {"speed mushroom", "speed-mushroom"},
+    ["Shrink Mushroom"] = {"shrink mushroom", "shrink-mushroom"},
+    ["Supersize Mushroom"] = {"supersize mushroom", "supersize-mushroom"},
+    ["Invisibility Mushroom"] = {"invisibility mushroom", "invisibility-mushroom"},
 }
 
 local function normalizeText(value)
@@ -420,21 +468,56 @@ local function parseItemText(text)
     return normalizeText(name), tonumber(qty) or 1
 end
 
+local function buildItemSearchVariants(name)
+    local variants = {}
+    local seen = {}
+    local function add(text)
+        local cleaned = normalizeText(text or "")
+        cleaned = cleaned:lower()
+        if cleaned ~= "" and not seen[cleaned] then
+            seen[cleaned] = true
+            table.insert(variants, cleaned)
+        end
+    end
+
+    add(name)
+    if type(name) == "string" then
+        add(name:gsub("%s+", "-"))
+        add(name:gsub("%s+", "_"))
+        add(name:gsub("%s+", ""))
+    end
+
+    local aliases = SEED_ASSET_ALIASES[name] or GEAR_ASSET_ALIASES[name]
+    if aliases then
+        for _, alias in ipairs(aliases) do
+            add(alias)
+        end
+    end
+
+    return variants
+end
+
 local function findKnownItemName(label)
-    local lower = label:lower()
+    local lower = normalizeText(label or ""):lower()
     for _, item in ipairs(SEED_DATABASE) do
-        if lower:find(item:lower(), 1, true) then
-            return item
+        for _, hint in ipairs(buildItemSearchVariants(item)) do
+            if lower:find(hint, 1, true) then
+                return item
+            end
         end
     end
     for _, item in ipairs(PET_DATABASE) do
-        if lower:find(item:lower(), 1, true) then
-            return item
+        for _, hint in ipairs(buildItemSearchVariants(item)) do
+            if lower:find(hint, 1, true) then
+                return item
+            end
         end
     end
     for _, item in ipairs(GEAR_DATABASE) do
-        if lower:find(item:lower(), 1, true) then
-            return item
+        for _, hint in ipairs(buildItemSearchVariants(item)) do
+            if lower:find(hint, 1, true) then
+                return item
+            end
         end
     end
     return label
@@ -445,21 +528,24 @@ local function categorizeItem(name)
     local lower = input:lower()
 
     for _, entry in ipairs(SEED_DATABASE) do
-        local seedName = entry:lower()
-        if lower == seedName or lower:find(seedName, 1, true) then
-            return "Seeds"
+        for _, hint in ipairs(buildItemSearchVariants(entry)) do
+            if lower == hint or lower:find(hint, 1, true) then
+                return "Seeds"
+            end
         end
     end
     for _, entry in ipairs(GEAR_DATABASE) do
-        local gearName = entry:lower()
-        if lower == gearName or lower:find(gearName, 1, true) then
-            return "Gear"
+        for _, hint in ipairs(buildItemSearchVariants(entry)) do
+            if lower == hint or lower:find(hint, 1, true) then
+                return "Gear"
+            end
         end
     end
     for _, entry in ipairs(PET_DATABASE) do
-        local petName = entry:lower()
-        if lower == petName or lower:find(petName, 1, true) then
-            return "Pets"
+        for _, hint in ipairs(buildItemSearchVariants(entry)) do
+            if lower == hint or lower:find(hint, 1, true) then
+                return "Pets"
+            end
         end
     end
 
@@ -774,16 +860,30 @@ local function findBuyButtonForItem(itemName, categoryHint)
     end
     local query = normalizeText(itemName):lower()
     local category = normalizeText(categoryHint or ""):lower()
-    local variants = {query}
+    local variants = {}
+    local seen = {}
+    local function addVariant(text)
+        local cleaned = normalizeText(text or ""):lower()
+        if cleaned ~= "" and not seen[cleaned] then
+            seen[cleaned] = true
+            table.insert(variants, cleaned)
+        end
+    end
+
+    addVariant(query)
+    addVariant(itemName)
+    for _, hint in ipairs(buildItemSearchVariants(itemName)) do
+        addVariant(hint)
+    end
     if category ~= "" then
-        table.insert(variants, category)
-        table.insert(variants, category .. " " .. query)
-        table.insert(variants, query .. " " .. category)
+        addVariant(category)
+        addVariant(category .. " " .. query)
+        addVariant(query .. " " .. category)
     end
     if query:find(" ", 1, true) then
         local simple = query:gsub("%s+", "")
         if simple ~= query then
-            table.insert(variants, simple)
+            addVariant(simple)
         end
     end
 
@@ -891,15 +991,23 @@ local function tryClickPurchaseTarget(itemName, categoryHint)
         end
     end
 
+    local itemQuery = normalizeText(itemName or ""):lower()
+    local categoryQuery = normalizeText(categoryHint or ""):lower()
     for _, obj in ipairs(PlayerGui:GetDescendants()) do
         if (obj:IsA("GuiButton") or obj:IsA("ImageButton")) and obj.Visible and obj.Active and not isOwnGui(obj) then
             local text = collectGuiText(obj):lower()
-            if text:find("buy", 1, true) or text:find("purchase", 1, true) or text:find("shop", 1, true) then
-                if text:find("seed", 1, true) or text:find("gear", 1, true) or text:find("sprinkler", 1, true) or text:find("watering", 1, true) or text:find("mushroom", 1, true) then
-                    if fireGuiButton(obj) then
-                        return true
-                    end
+            local qualifies = false
+            if text:find("buy", 1, true) or text:find("purchase", 1, true) or text:find("shop", 1, true) or text:find("get", 1, true) then
+                if itemQuery ~= "" and (text:find(itemQuery, 1, true) or text:find(itemQuery:gsub("%s+", ""), 1, true)) then
+                    qualifies = true
+                elseif categoryQuery ~= "" and text:find(categoryQuery, 1, true) then
+                    qualifies = true
+                elseif text:find("seed", 1, true) or text:find("gear", 1, true) or text:find("sprinkler", 1, true) or text:find("watering", 1, true) or text:find("mushroom", 1, true) then
+                    qualifies = true
                 end
+            end
+            if qualifies and fireGuiButton(obj) then
+                return true
             end
         end
     end
@@ -1712,4 +1820,5 @@ return {
     SyncInventory = SyncInventory,
     settings = settings,
 }
+
 
