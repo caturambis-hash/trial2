@@ -1,0 +1,898 @@
+-- =====================================================
+-- HUB SCRIPT - Open Source Version
+-- =====================================================
+
+-- [[ SERVICES ]]
+local Players = game:GetService("Players")
+local TweenService = game:GetService("TweenService")
+local UserInputService = game:GetService("UserInputService")
+local RunService = game:GetService("RunService")
+local TeleportService = game:GetService("TeleportService")
+local StarterGui = game:GetService("StarterGui")
+
+local player = Players.LocalPlayer
+if not player then return end
+
+local playerGui = player:WaitForChild("PlayerGui")
+
+-- [[ KONFIGURASI ]]
+local GUI_CONFIG = {
+    Width = 340,
+    TitleHeight = 64,
+    TopBarHeight = 20,
+    StatusBarHeight = 20,
+    ButtonHeight = 44,
+    ToggleHeight = 28,
+    Spacing = 10,
+    Padding = 12,
+    AnimationSpeed = 0.28
+}
+
+-- [[ DAFTAR WHITELIST ]]
+local whitelist = {
+    "ceszfarm6",
+    "NamaPlayer2",
+    "NamaPlayer3",
+    "Test",
+    "BuilderPH",
+    "YourNameHere"
+}
+
+-- Fungsi pengecekan whitelist (case insensitive)
+local function isWhitelisted(username)
+    for _, name in ipairs(whitelist) do
+        if string.lower(name) == string.lower(username) then
+            return true
+        end
+    end
+    return false
+end
+
+-- [[ VARIABEL GLOBAL ]]
+local playerName = player.Name
+local guiObject = nil
+local connections = {}
+local isGUIInitialized = false
+
+-- [[ FUNGSI UTILITY ]]
+local function createInstance(className, properties)
+    local instance = Instance.new(className)
+    if properties then
+        for prop, value in pairs(properties) do
+            instance[prop] = value
+        end
+    end
+    return instance
+end
+
+local function fireServer(action, data)
+    if guiObject then
+        pcall(function()
+            guiObject:FireServer(action, data)
+        end)
+    end
+end
+
+local function clearConnections()
+    for _, connection in ipairs(connections) do
+        if connection and connection.Connected then
+            pcall(function() connection:Disconnect() end)
+        end
+    end
+    connections = {}
+end
+
+-- [[ FUNGSI NOTIFIKASI ]]
+local function showNotification(text, subText, duration, bgColor, textColor)
+    duration = duration or 3
+    bgColor = bgColor or Color3.fromRGB(60, 40, 50)
+    textColor = textColor or Color3.fromRGB(230, 200, 240)
+    
+    local container = createInstance("ScreenGui", {
+        Name = "NotificationContainer",
+        IgnoreGuiInset = true,
+        Parent = playerGui
+    })
+    
+    local frame = createInstance("Frame", {
+        BackgroundColor3 = Color3.fromRGB(30, 30, 35),
+        BorderSizePixel = 0,
+        Position = UDim2.new(0, 0, 0, 20),
+        Size = UDim2.new(0, GUI_CONFIG.Width, 0, 84),
+        Parent = container
+    })
+    
+    -- Efek shadow
+    local shadow = createInstance("Frame", {
+        BackgroundColor3 = Color3.fromRGB(0, 0, 0),
+        BackgroundTransparency = 0.4,
+        BorderSizePixel = 0,
+        Position = UDim2.new(0, -2, 0, 2),
+        Size = UDim2.new(1, 4, 1, 4),
+        Parent = frame
+    })
+    
+    -- Label judul
+    local titleLabel = createInstance("TextLabel", {
+        BackgroundTransparency = 1,
+        Font = Enum.Font.GothamBold,
+        Text = text,
+        TextColor3 = textColor,
+        TextSize = 18,
+        TextXAlignment = Enum.TextXAlignment.Left,
+        Position = UDim2.new(0, GUI_CONFIG.Padding, 0, 10),
+        Size = UDim2.new(1, -GUI_CONFIG.Padding * 2, 0, 24),
+        Parent = frame
+    })
+    
+    -- Label subteks
+    local subLabel = createInstance("TextLabel", {
+        BackgroundTransparency = 1,
+        Font = Enum.Font.Gotham,
+        Text = subText or "",
+        TextColor3 = Color3.fromRGB(180, 160, 170),
+        TextSize = 13,
+        TextXAlignment = Enum.TextXAlignment.Left,
+        Position = UDim2.new(0, GUI_CONFIG.Padding, 0, 40),
+        Size = UDim2.new(1, -GUI_CONFIG.Padding * 2, 0, 30),
+        Parent = frame
+    })
+    
+    -- Animasi masuk
+    frame.Position = UDim2.new(1, 400, 0, 20)
+    local tweenIn = TweenService:Create(frame, 
+        TweenInfo.new(0.28, Enum.EasingStyle.Quad), 
+        {Position = UDim2.new(1, -GUI_CONFIG.Width - 40, 0, 20)}
+    )
+    tweenIn:Play()
+    
+    -- Animasi keluar otomatis
+    delay(duration, function()
+        if frame and frame.Parent then
+            local tweenOut = TweenService:Create(frame,
+                TweenInfo.new(0.26, Enum.EasingStyle.Quad),
+                {Position = UDim2.new(1, 400, 0, 20)}
+            )
+            tweenOut:Play()
+            delay(0.3, function()
+                if container and container.Parent then
+                    container:Destroy()
+                end
+            end)
+        end
+    end)
+    
+    return container
+end
+
+-- [[ NOTIFIKASI DENGAN PROGRESS BAR ]]
+local function showProgressNotification(text, subText, duration, bgColor, textColor, onComplete)
+    duration = duration or 2
+    bgColor = bgColor or Color3.fromRGB(40, 40, 45)
+    textColor = textColor or Color3.fromRGB(230, 200, 240)
+    
+    local container = createInstance("ScreenGui", {
+        Name = "ProgressNotification",
+        IgnoreGuiInset = true,
+        Parent = playerGui
+    })
+    
+    local frame = createInstance("Frame", {
+        BackgroundColor3 = Color3.fromRGB(28, 28, 32),
+        BorderSizePixel = 0,
+        Position = UDim2.new(0, 0, 0, 20),
+        Size = UDim2.new(0, GUI_CONFIG.Width, 0, 84),
+        ClipsDescendants = false,
+        Parent = container
+    })
+    
+    -- Shadow
+    local shadow = createInstance("Frame", {
+        BackgroundColor3 = Color3.fromRGB(0, 0, 0),
+        BackgroundTransparency = 0.4,
+        BorderSizePixel = 0,
+        Position = UDim2.new(0, -2, 0, 2),
+        Size = UDim2.new(1, 4, 1, 4),
+        Parent = frame
+    })
+    
+    -- Progress bar background
+    local progressBg = createInstance("Frame", {
+        BackgroundColor3 = Color3.fromRGB(50, 40, 60),
+        BorderSizePixel = 0,
+        Position = UDim2.new(0, GUI_CONFIG.Padding, 0, 60),
+        Size = UDim2.new(1, -GUI_CONFIG.Padding * 2, 0, 6),
+        Parent = frame
+    })
+    
+    -- Progress bar fill
+    local progressFill = createInstance("Frame", {
+        BackgroundColor3 = bgColor,
+        BorderSizePixel = 0,
+        Size = UDim2.new(0, 0, 1, 0),
+        Parent = progressBg
+    })
+    
+    -- Label judul
+    local titleLabel = createInstance("TextLabel", {
+        BackgroundTransparency = 1,
+        Font = Enum.Font.GothamBold,
+        Text = text,
+        TextColor3 = textColor,
+        TextSize = 18,
+        TextXAlignment = Enum.TextXAlignment.Left,
+        Position = UDim2.new(0, GUI_CONFIG.Padding, 0, 10),
+        Size = UDim2.new(1, -GUI_CONFIG.Padding * 2, 0, 24),
+        Parent = frame
+    })
+    
+    -- Label subteks
+    local subLabel = createInstance("TextLabel", {
+        BackgroundTransparency = 1,
+        Font = Enum.Font.Gotham,
+        Text = subText or "",
+        TextColor3 = Color3.fromRGB(180, 160, 170),
+        TextSize = 13,
+        TextXAlignment = Enum.TextXAlignment.Left,
+        Position = UDim2.new(0, GUI_CONFIG.Padding, 0, 40),
+        Size = UDim2.new(1, -GUI_CONFIG.Padding * 2, 0, 30),
+        Parent = frame
+    })
+    
+    -- Label persentase
+    local percentLabel = createInstance("TextLabel", {
+        BackgroundTransparency = 1,
+        Font = Enum.Font.Gotham,
+        Text = "0%",
+        TextColor3 = Color3.fromRGB(200, 180, 190),
+        TextSize = 14,
+        TextXAlignment = Enum.TextXAlignment.Right,
+        Position = UDim2.new(1, -GUI_CONFIG.Padding, 0, 40),
+        Size = UDim2.new(0, 80, 0, 30),
+        Parent = frame
+    })
+    
+    -- Animasi masuk
+    frame.Position = UDim2.new(1, 400, 0, 20)
+    local tweenIn = TweenService:Create(frame,
+        TweenInfo.new(0.32, Enum.EasingStyle.Quad),
+        {Position = UDim2.new(1, -GUI_CONFIG.Width - 40, 0, 20)}
+    )
+    tweenIn:Play()
+    
+    -- Progress bar animation
+    spawn(function()
+        local startTime = tick()
+        local isRunning = true
+        
+        local connection = RunService.Heartbeat:Connect(function(dt)
+            if not isRunning then return end
+            
+            local elapsed = tick() - startTime
+            local progress = math.clamp(elapsed / duration, 0, 1)
+            local percent = math.floor(progress * 100) + 1
+            
+            percentLabel.Text = tostring(percent) .. "%"
+            
+            local width = progressBg.AbsoluteSize.X
+            if width > 0 then
+                local fillWidth = math.max(6, math.floor(width * progress))
+                progressFill.Size = UDim2.new(0, fillWidth, 1, 0)
+            end
+            
+            if progress >= 1 then
+                isRunning = false
+                progressFill.BackgroundColor3 = Color3.fromRGB(90, 70, 100)
+                
+                delay(0.36, function()
+                    local tweenOut = TweenService:Create(frame,
+                        TweenInfo.new(0.26, Enum.EasingStyle.Quad),
+                        {Position = UDim2.new(1, 400, 0, 20)}
+                    )
+                    tweenOut:Play()
+                    delay(0.28, function()
+                        if container and container.Parent then
+                            container:Destroy()
+                        end
+                        if onComplete then
+                            pcall(onComplete)
+                        end
+                    end)
+                end)
+            end
+        end)
+        
+        table.insert(connections, connection)
+        
+        -- Cleanup jika container dihancurkan
+        local ancestryConnection = container.AncestryChanged:Connect(function()
+            if not container:IsDescendantOf(game) and connection and connection.Connected then
+                pcall(function() connection:Disconnect() end)
+            end
+        end)
+        table.insert(connections, ancestryConnection)
+    end)
+    
+    return container
+end
+
+-- [[ MEMBUAT TOGGLE ]]
+local function createToggle(toggleText, defaultState, fireKey, onToggle)
+    local toggleData = {
+        Enabled = defaultState or false,
+        Container = nil,
+        Frame = nil,
+        Inner = nil,
+        StateLabel = nil
+    }
+    
+    -- Container frame
+    local container = createInstance("Frame", {
+        Name = "ToggleContainer",
+        BackgroundColor3 = Color3.fromRGB(35, 30, 35),
+        BorderSizePixel = 0,
+        Size = UDim2.new(1, 0, 0, GUI_CONFIG.ToggleHeight + 16),
+        ClipsDescendants = false,
+        Parent = nil -- akan di-set oleh caller
+    })
+    
+    -- Tombol area
+    local buttonArea = createInstance("ImageButton", {
+        BackgroundColor3 = Color3.fromRGB(40, 35, 40),
+        BackgroundTransparency = 0,
+        BorderSizePixel = 0,
+        Position = UDim2.new(0, 0, 0, 0),
+        Size = UDim2.new(1, 0, 1, 0),
+        AutoButtonColor = false,
+        Parent = container
+    })
+    
+    -- Label teks
+    local textLabel = createInstance("TextLabel", {
+        BackgroundTransparency = 1,
+        Font = Enum.Font.Gotham,
+        Text = toggleText,
+        TextColor3 = Color3.fromRGB(220, 200, 210),
+        TextSize = 14,
+        TextXAlignment = Enum.TextXAlignment.Left,
+        Position = UDim2.new(0, GUI_CONFIG.Padding, 0, 0),
+        Size = UDim2.new(0.7, -GUI_CONFIG.Padding, 1, 0),
+        Parent = container
+    })
+    
+    -- Toggle frame
+    local toggleFrame = createInstance("Frame", {
+        BackgroundColor3 = Color3.fromRGB(50, 45, 55),
+        BorderSizePixel = 0,
+        Position = UDim2.new(1, -60 - GUI_CONFIG.Padding, 0.5, -12),
+        Size = UDim2.new(0, 44, 0, 24),
+        Parent = container
+    })
+    
+    -- Toggle inner (lingkaran)
+    local toggleInner = createInstance("Frame", {
+        BackgroundColor3 = Color3.fromRGB(80, 70, 90),
+        BorderSizePixel = 0,
+        Position = UDim2.new(0, 2, 0, 2),
+        Size = UDim2.new(0, 20, 0, 20),
+        Parent = toggleFrame
+    })
+    
+    -- State label (on/off)
+    local stateLabel = createInstance("TextLabel", {
+        BackgroundTransparency = 1,
+        Font = Enum.Font.Gotham,
+        Text = "OFF",
+        TextColor3 = Color3.fromRGB(160, 140, 150),
+        TextSize = 12,
+        TextXAlignment = Enum.TextXAlignment.Right,
+        Position = UDim2.new(1, -70 - GUI_CONFIG.Padding, 0.5, -10),
+        Size = UDim2.new(0, 40, 0, 20),
+        Parent = container
+    })
+    
+    toggleData.Container = container
+    toggleData.Frame = toggleFrame
+    toggleData.Inner = toggleInner
+    toggleData.StateLabel = stateLabel
+    
+    -- Fungsi update toggle
+    local function updateToggle(state)
+        toggleData.Enabled = state
+        
+        local targetPosition = state and UDim2.new(1, -22, 0, 2) or UDim2.new(0, 2, 0, 2)
+        local targetColor = state and Color3.fromRGB(100, 180, 100) or Color3.fromRGB(80, 70, 90)
+        local targetText = state and "ON" or "OFF"
+        local targetTextColor = state and Color3.fromRGB(120, 220, 120) or Color3.fromRGB(160, 140, 150)
+        local targetFrameColor = state and Color3.fromRGB(60, 140, 60) or Color3.fromRGB(50, 45, 55)
+        
+        TweenService:Create(toggleInner, TweenInfo.new(0.22, Enum.EasingStyle.Quad), {
+            Position = targetPosition,
+            BackgroundColor3 = targetColor
+        }):Play()
+        
+        TweenService:Create(toggleFrame, TweenInfo.new(0.22), {
+            BackgroundColor3 = targetFrameColor
+        }):Play()
+        
+        TweenService:Create(stateLabel, TweenInfo.new(0.22), {
+            Text = targetText,
+            TextColor3 = targetTextColor
+        }):Play()
+    end
+    
+    -- Event klik
+    buttonArea.MouseButton1Click:Connect(function()
+        toggleData.Enabled = not toggleData.Enabled
+        updateToggle(toggleData.Enabled)
+        fireServer(fireKey, (toggleData.Enabled and "on") or "off")
+        if onToggle then
+            onToggle(toggleData.Enabled)
+        end
+    end)
+    
+    -- Inisialisasi state
+    updateToggle(defaultState)
+    
+    return toggleData
+end
+
+-- [[ MEMBUAT TOMBOL ]]
+local function createButton(buttonText, buttonColor, onClick)
+    local button = createInstance("TextButton", {
+        BackgroundColor3 = buttonColor or Color3.fromRGB(50, 40, 60),
+        BorderSizePixel = 0,
+        Font = Enum.Font.GothamBold,
+        Text = buttonText,
+        TextColor3 = Color3.fromRGB(240, 220, 245),
+        TextSize = 16,
+        AutoButtonColor = false,
+        BackgroundTransparency = 0,
+        Parent = nil
+    })
+    
+    -- Efek hover
+    button.MouseEnter:Connect(function()
+        TweenService:Create(button, TweenInfo.new(0.12), {
+            BackgroundColor3 = button.BackgroundColor3:Lerp(Color3.new(0.15, 0.05, 0.2), 0.08)
+        }):Play()
+    end)
+    
+    button.MouseLeave:Connect(function()
+        TweenService:Create(button, TweenInfo.new(0.12), {
+            BackgroundColor3 = button.BackgroundColor3:Lerp(Color3.new(0.2, 0.15, 0.25), 0.08)
+        }):Play()
+    end)
+    
+    if onClick then
+        button.MouseButton1Click:Connect(onClick)
+    end
+    
+    return button
+end
+
+-- [[ MEMBUAT UI UTAMA ]]
+local function buildMainUI()
+    -- Container utama
+    local container = createInstance("ScreenGui", {
+        Name = "MainGUI",
+        IgnoreGuiInset = true,
+        Parent = playerGui
+    })
+    
+    local mainFrame = createInstance("Frame", {
+        Name = "MainFrame",
+        BackgroundColor3 = Color3.fromRGB(25, 20, 28),
+        BorderSizePixel = 0,
+        Size = UDim2.new(0, GUI_CONFIG.Width, 0, 220),
+        Position = UDim2.new(1, -GUI_CONFIG.Width - 40, 0, 20),
+        ClipsDescendants = false,
+        Parent = container
+    })
+    
+    -- Shadow
+    local shadow = createInstance("Frame", {
+        BackgroundColor3 = Color3.fromRGB(0, 0, 0),
+        BackgroundTransparency = 0.5,
+        BorderSizePixel = 0,
+        Position = UDim2.new(0, -3, 0, 3),
+        Size = UDim2.new(1, 6, 1, 6),
+        Parent = mainFrame
+    })
+    
+    -- Top bar (drag area)
+    local topBar = createInstance("Frame", {
+        BackgroundColor3 = Color3.fromRGB(35, 28, 40),
+        BorderSizePixel = 0,
+        Size = UDim2.new(1, 0, 0, GUI_CONFIG.TitleHeight),
+        Parent = mainFrame
+    })
+    
+    -- Header teks
+    local titleText = createInstance("TextLabel", {
+        BackgroundTransparency = 1,
+        Font = Enum.Font.GothamBold,
+        Text = "✦ " .. playerName .. "'s Hub",
+        TextColor3 = Color3.fromRGB(230, 200, 240),
+        TextSize = 18,
+        TextXAlignment = Enum.TextXAlignment.Left,
+        Position = UDim2.new(0, GUI_CONFIG.Padding, 0, 0),
+        Size = UDim2.new(1, -GUI_CONFIG.Padding, 1, 0),
+        Parent = topBar
+    })
+    
+    -- Tombol minimize
+    local minimizeBtn = createInstance("TextButton", {
+        BackgroundColor3 = Color3.fromRGB(60, 40, 50),
+        BorderSizePixel = 0,
+        Font = Enum.Font.Gotham,
+        Text = "—",
+        TextColor3 = Color3.fromRGB(200, 180, 190),
+        TextSize = 22,
+        Position = UDim2.new(1, -50, 0, 0),
+        Size = UDim2.new(0, 30, 1, 0),
+        AutoButtonColor = false,
+        Parent = topBar
+    })
+    
+    -- Content area
+    local contentArea = createInstance("Frame", {
+        BackgroundColor3 = Color3.fromRGB(30, 25, 33),
+        BorderSizePixel = 0,
+        Size = UDim2.new(1, 0, 1, -GUI_CONFIG.TitleHeight),
+        Position = UDim2.new(0, 0, 0, GUI_CONFIG.TitleHeight),
+        ClipsDescendants = false,
+        Parent = mainFrame
+    })
+    
+    -- Scrolling frame
+    local scrollFrame = createInstance("ScrollingFrame", {
+        BackgroundColor3 = Color3.fromRGB(30, 25, 33),
+        BorderSizePixel = 0,
+        Size = UDim2.new(1, 0, 1, 0),
+        CanvasSize = UDim2.new(0, 0, 0, 0),
+        ScrollBarThickness = 4,
+        ScrollBarImageColor3 = Color3.fromRGB(60, 40, 70),
+        Parent = contentArea
+    })
+    
+    -- Padding untuk scroll
+    local padding = createInstance("UIPadding", {
+        PaddingLeft = UDim.new(0, GUI_CONFIG.Padding),
+        PaddingRight = UDim.new(0, GUI_CONFIG.Padding),
+        PaddingTop = UDim.new(0, GUI_CONFIG.Padding),
+        PaddingBottom = UDim.new(0, GUI_CONFIG.Padding),
+        Parent = scrollFrame
+    })
+    
+    -- Layout untuk child
+    local layout = createInstance("UIListLayout", {
+        SortOrder = Enum.SortOrder.LayoutOrder,
+        Padding = UDim.new(0, GUI_CONFIG.Spacing),
+        HorizontalAlignment = Enum.HorizontalAlignment.Left,
+        Parent = scrollFrame
+    })
+    
+    -- Simpan referensi global
+    guiObject = container
+    
+    -- [[ MEMBUAT ELEMEN UI ]]
+    local elements = {}
+    
+    -- 1. Toggle pertama
+    local toggle1 = createToggle("Enable Feature", false, "feature1")
+    toggle1.Container.Parent = scrollFrame
+    table.insert(elements, toggle1)
+    
+    -- 2. Toggle kedua
+    local toggle2 = createToggle("Enable Feature 2", false, "feature2")
+    toggle2.Container.Parent = scrollFrame
+    table.insert(elements, toggle2)
+    
+    -- 3. Tombol "Rejoin"
+    local rejoinBtn = createButton("↻ Rejoin", Color3.fromRGB(50, 40, 60), function()
+        -- Efek klik
+        local originalColor = rejoinBtn.BackgroundColor3
+        TweenService:Create(rejoinBtn, TweenInfo.new(0.12), {
+            BackgroundColor3 = originalColor:Lerp(Color3.new(0.1, 0.05, 0.15), 0.08)
+        }):Play()
+        
+        -- Menampilkan notifikasi progress
+        showProgressNotification(
+            "↻ Rejoining",
+            "Connecting to server...",
+            3,
+            Color3.fromRGB(60, 40, 50),
+            Color3.fromRGB(230, 200, 240),
+            function()
+                -- Coba teleport
+                local success, err = pcall(function()
+                    TeleportService:Teleport(game.PlaceId, player)
+                end)
+                
+                if not success then
+                    showNotification(
+                        "✗ Rejoin Failed",
+                        tostring(err),
+                        3,
+                        Color3.fromRGB(50, 30, 35),
+                        Color3.fromRGB(255, 180, 180)
+                    )
+                else
+                    showNotification(
+                        "✓ Rejoining",
+                        "Teleporting...",
+                        2,
+                        Color3.fromRGB(30, 50, 40),
+                        Color3.fromRGB(180, 255, 200)
+                    )
+                end
+            end
+        )
+    end)
+    
+    rejoinBtn.Size = UDim2.new(1, 0, 0, GUI_CONFIG.ButtonHeight)
+    rejoinBtn.Parent = scrollFrame
+    rejoinBtn.LayoutOrder = 3
+    
+    -- 4. Tombol "Separate"
+    local separateBtn = createButton("⊞ Separate Mode", Color3.fromRGB(40, 40, 50), function()
+        showNotification(
+            "✓ Separate Mode",
+            "Feature toggled!",
+            2,
+            Color3.fromRGB(30, 50, 40),
+            Color3.fromRGB(180, 255, 200)
+        )
+        fireServer("separate", "toggle")
+    end)
+    
+    separateBtn.Size = UDim2.new(1, 0, 0, GUI_CONFIG.ButtonHeight)
+    separateBtn.Parent = scrollFrame
+    separateBtn.LayoutOrder = 4
+    
+    -- Update canvas size
+    local function updateCanvasSize()
+        local contentHeight = layout.AbsoluteContentSize.Y
+        local newHeight = GUI_CONFIG.Padding * 2 + contentHeight + GUI_CONFIG.Spacing
+        scrollFrame.CanvasSize = UDim2.new(0, 0, 0, newHeight)
+        
+        -- Update main frame height
+        local visibleHeight = math.min(newHeight + GUI_CONFIG.TitleHeight + 20, 400)
+        mainFrame.Size = UDim2.new(0, GUI_CONFIG.Width, 0, visibleHeight)
+    end
+    
+    -- Listener untuk perubahan layout
+    local layoutConnection = layout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
+        updateCanvasSize()
+    end)
+    table.insert(connections, layoutConnection)
+    
+    -- [[ DRAG FUNCTIONALITY ]]
+    local isDragging = false
+    local dragStartPos = nil
+    local frameStartPos = nil
+    
+    topBar.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or 
+           input.UserInputType == Enum.UserInputType.Touch then
+            isDragging = true
+            dragStartPos = input.Position
+            frameStartPos = mainFrame.Position
+        end
+    end)
+    
+    topBar.InputEnded:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or 
+           input.UserInputType == Enum.UserInputType.Touch then
+            isDragging = false
+            dragStartPos = nil
+        end
+    end)
+    
+    UserInputService.InputChanged:Connect(function(input)
+        if isDragging and input.Position and 
+           (input.UserInputType == Enum.UserInputType.MouseMovement or 
+            input.UserInputType == Enum.UserInputType.Touch) then
+            
+            local delta = input.Position - dragStartPos
+            local newX = frameStartPos.X.Offset + delta.X
+            local newY = frameStartPos.Y.Offset + delta.Y
+            
+            -- Clamp ke layar
+            local viewportSize = workspace.CurrentCamera and workspace.CurrentCamera.ViewportSize or Vector2.new(800, 600)
+            local maxX = math.max(0, viewportSize.X - mainFrame.AbsoluteSize.X)
+            local maxY = math.max(0, viewportSize.Y - mainFrame.AbsoluteSize.Y)
+            
+            newX = math.clamp(newX, 0, maxX)
+            newY = math.clamp(newY, 0, maxY)
+            
+            mainFrame.Position = UDim2.new(0, newX, 0, newY)
+        end
+    end)
+    
+    -- [[ MINIMIZE ]]
+    local isMinimized = false
+    local originalSize = mainFrame.Size
+    
+    minimizeBtn.MouseButton1Click:Connect(function()
+        isMinimized = not isMinimized
+        
+        if isMinimized then
+            -- Minimize: hanya tampilkan top bar
+            TweenService:Create(mainFrame, TweenInfo.new(0.22), {
+                Size = UDim2.new(0, GUI_CONFIG.Width, 0, GUI_CONFIG.TitleHeight)
+            }):Play()
+            contentArea.Visible = false
+            minimizeBtn.Text = "□"
+        else
+            -- Restore
+            contentArea.Visible = true
+            TweenService:Create(mainFrame, TweenInfo.new(0.22, Enum.EasingStyle.Back), {
+                Size = originalSize
+            }):Play()
+            minimizeBtn.Text = "—"
+        end
+    end)
+    
+    -- [[ ANIMASI MASUK ]]
+    mainFrame.Position = UDim2.new(1, 200, 0, 20)
+    mainFrame.BackgroundTransparency = 1
+    
+    TweenService:Create(mainFrame, TweenInfo.new(0.36, Enum.EasingStyle.Quad), {
+        BackgroundTransparency = 0
+    }):Play()
+    
+    TweenService:Create(mainFrame, TweenInfo.new(0.36, Enum.EasingStyle.Back), {
+        Position = UDim2.new(1, -GUI_CONFIG.Width - 40, 0, 20)
+    }):Play()
+    
+    -- [[ CLEANUP ]]
+    container.AncestryChanged:Connect(function()
+        if not container:IsDescendantOf(game) then
+            clearConnections()
+            pcall(function()
+                playerGui:SetAttribute("HubInitialized", nil)
+            end)
+        end
+    end)
+    
+    -- Return referensi
+    return {
+        Container = container,
+        MainFrame = mainFrame,
+        TopBar = topBar,
+        ContentArea = contentArea,
+        ScrollFrame = scrollFrame,
+        Elements = elements,
+        Toggle1 = toggle1,
+        Toggle2 = toggle2,
+        RejoinBtn = rejoinBtn,
+        SeparateBtn = separateBtn
+    }
+end
+
+-- [[ NOTIFIKASI ACCESS DENIED ]]
+local function showAccessDenied()
+    local container = createInstance("ScreenGui", {
+        Name = "AccessDenied",
+        IgnoreGuiInset = true,
+        Parent = playerGui
+    })
+    
+    local frame = createInstance("Frame", {
+        BackgroundColor3 = Color3.fromRGB(35, 25, 30),
+        BorderSizePixel = 0,
+        Size = UDim2.new(0, GUI_CONFIG.Width, 0, 140),
+        Position = UDim2.new(1, -GUI_CONFIG.Width - 40, 0, 20),
+        ClipsDescendants = false,
+        Parent = container
+    })
+    
+    -- Shadow
+    createInstance("Frame", {
+        BackgroundColor3 = Color3.fromRGB(0, 0, 0),
+        BackgroundTransparency = 0.4,
+        BorderSizePixel = 0,
+        Position = UDim2.new(0, -2, 0, 2),
+        Size = UDim2.new(1, 4, 1, 4),
+        Parent = frame
+    })
+    
+    -- Icon dan judul
+    local titleLabel = createInstance("TextLabel", {
+        BackgroundTransparency = 1,
+        Font = Enum.Font.GothamBold,
+        Text = "⚠ Access Denied",
+        TextColor3 = Color3.fromRGB(255, 180, 100),
+        TextSize = 20,
+        TextXAlignment = Enum.TextXAlignment.Left,
+        Position = UDim2.new(0, GUI_CONFIG.Padding, 0, 10),
+        Size = UDim2.new(1, -GUI_CONFIG.Padding * 2, 0, 30),
+        Parent = frame
+    })
+    
+    -- Pesan
+    local messageLabel = createInstance("TextLabel", {
+        BackgroundTransparency = 1,
+        Font = Enum.Font.Gotham,
+        Text = "You are not whitelisted.\nContact BUILDERPH for access.",
+        TextColor3 = Color3.fromRGB(200, 180, 180),
+        TextSize = 14,
+        TextXAlignment = Enum.TextXAlignment.Left,
+        Position = UDim2.new(0, GUI_CONFIG.Padding, 0, 45),
+        Size = UDim2.new(1, -GUI_CONFIG.Padding * 2, 0, 50),
+        Parent = frame
+    })
+    
+    -- Animasi masuk
+    frame.Position = UDim2.new(1, 400, 0, 20)
+    TweenService:Create(frame, TweenInfo.new(0.36, Enum.EasingStyle.Quad), {
+        Position = UDim2.new(1, -GUI_CONFIG.Width - 40, 0, 20)
+    }):Play()
+    
+    -- Cleanup
+    container.AncestryChanged:Connect(function()
+        if not container:IsDescendantOf(game) then
+            clearConnections()
+            pcall(function()
+                playerGui:SetAttribute("HubInitialized", nil)
+            end)
+        end
+    end)
+    
+    return container
+end
+
+-- [[ INISIALISASI ]]
+local function initialize()
+    -- Cek apakah sudah diinisialisasi
+    if playerGui:GetAttribute("HubInitialized") then
+        return
+    end
+    playerGui:SetAttribute("HubInitialized", true)
+    
+    -- Cek whitelist
+    local isAllowed = isWhitelisted(playerName)
+    
+    if isAllowed then
+        showNotification(
+            "✓ Whitelisted",
+            "Welcome " .. playerName .. "!",
+            2.6,
+            Color3.fromRGB(30, 55, 40),
+            Color3.fromRGB(180, 255, 200)
+        )
+        
+        delay(0.6, function()
+            pcall(buildMainUI)
+        end)
+    else
+        showNotification(
+            "⚠ Not Whitelisted",
+            "Access denied for " .. playerName,
+            3.2,
+            Color3.fromRGB(50, 30, 35),
+            Color3.fromRGB(255, 180, 180)
+        )
+        
+        delay(0.6, function()
+            pcall(showAccessDenied)
+        end)
+    end
+end
+
+-- [[ START ]]
+spawn(function()
+    initialize()
+    
+    -- Cleanup jika player keluar
+    wait(30)
+    if playerGui:GetAttribute("HubInitialized") then
+        if not playerGui:FindFirstChild("MainGUI") then
+            pcall(function()
+                playerGui:SetAttribute("HubInitialized", nil)
+            end)
+        end
+    end
+end)
