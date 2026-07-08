@@ -64,6 +64,46 @@ local function normalizeUsername(value)
     return username
 end
 
+local function callRemoteMethod(target, ...)
+    if not target then
+        return nil
+    end
+    local args = {...}
+    if type(target.Fire) == "function" then
+        local ok, result = pcall(function()
+            return target:Fire(unpack(args))
+        end)
+        if ok then
+            return result
+        end
+    end
+    if type(target.FireServer) == "function" then
+        local ok, result = pcall(function()
+            return target:FireServer(unpack(args))
+        end)
+        if ok then
+            return result
+        end
+    end
+    if type(target.InvokeServer) == "function" then
+        local ok, result = pcall(function()
+            return target:InvokeServer(unpack(args))
+        end)
+        if ok then
+            return result
+        end
+    end
+    if type(target.Invoke) == "function" then
+        local ok, result = pcall(function()
+            return target:Invoke(unpack(args))
+        end)
+        if ok then
+            return result
+        end
+    end
+    return nil
+end
+
 local function lookupRecipient(username)
     username = normalizeUsername(username)
     if username == "" then
@@ -72,7 +112,7 @@ local function lookupRecipient(username)
 
     if Networking and Networking.Mailbox and Networking.Mailbox.LookupPlayer then
         local ok, result = pcall(function()
-            return Networking.Mailbox.LookupPlayer:Fire(username)
+            return callRemoteMethod(Networking.Mailbox.LookupPlayer, username)
         end)
         if ok and typeof(result) == "number" and result > 0 then
             return result
@@ -308,7 +348,7 @@ local function sendBatch(userId, payload, note)
     end
 
     local ok, result, message = pcall(function()
-        return Networking.Mailbox.SendBatch:Fire(userId, payload, safeNote)
+        return callRemoteMethod(Networking.Mailbox.SendBatch, userId, payload, safeNote)
     end)
 
     if not ok then
@@ -765,6 +805,14 @@ local function findBuyButtonForItem(itemName, categoryHint)
         local parentText = collectGuiText(button.Parent)
         local ancestorText = ""
         local ancestor = button.Parent
+        local siblingText = ""
+        if button.Parent then
+            for _, child in ipairs(button.Parent:GetDescendants()) do
+                if child ~= button and (child:IsA("TextLabel") or child:IsA("TextButton") or child:IsA("TextBox")) then
+                    siblingText = siblingText .. " " .. collectGuiText(child)
+                end
+            end
+        end
         for _ = 1, 4 do
             if not ancestor then
                 break
@@ -775,13 +823,13 @@ local function findBuyButtonForItem(itemName, categoryHint)
         local score = 0
         local hasMatch = false
         for _, variant in ipairs(variants) do
-            if variant ~= "" and (text:find(variant, 1, true) or name:find(variant, 1, true) or parentText:find(variant, 1, true) or ancestorText:find(variant, 1, true)) then
+            if variant ~= "" and (text:find(variant, 1, true) or name:find(variant, 1, true) or parentText:find(variant, 1, true) or ancestorText:find(variant, 1, true) or siblingText:find(variant, 1, true)) then
                 hasMatch = true
                 break
             end
         end
         if hasMatch then
-            score = score + 8
+            score = score + 10
         end
         if text:find("buy", 1, true) or text:find("purchase", 1, true) or text:find("shop", 1, true)
             or text:find("get", 1, true) or text:find("claim", 1, true) or text:find("collect", 1, true) then
@@ -795,13 +843,16 @@ local function findBuyButtonForItem(itemName, categoryHint)
             or ancestorText:find("catalog", 1, true) or ancestorText:find("buy", 1, true) then
             score = score + 2
         end
-        if category ~= "" and (text:find(category, 1, true) or parentText:find(category, 1, true) or ancestorText:find(category, 1, true)) then
+        if category ~= "" and (text:find(category, 1, true) or parentText:find(category, 1, true) or ancestorText:find(category, 1, true) or siblingText:find(category, 1, true)) then
             score = score + 2
         end
         if hasMatch and (text:find("buy", 1, true) or parentText:find("buy", 1, true) or ancestorText:find("buy", 1, true)) then
             score = score + 3
         end
-        if isBlockedText(text) or isBlockedText(parentText) or isBlockedText(ancestorText) then
+        if not hasMatch and (text:find("buy", 1, true) or text:find("purchase", 1, true) or text:find("get", 1, true) or parentText:find("buy", 1, true) or ancestorText:find("buy", 1, true)) then
+            score = score + 2
+        end
+        if isBlockedText(text) or isBlockedText(parentText) or isBlockedText(ancestorText) or isBlockedText(siblingText) then
             score = score - 120
         end
         if score > bestScore then
@@ -810,7 +861,7 @@ local function findBuyButtonForItem(itemName, categoryHint)
         end
     end
 
-    if bestButton and bestScore >= 6 then
+    if bestButton and bestScore >= 4 then
         return bestButton
     end
     return nil
@@ -1348,6 +1399,10 @@ local function createMailGui()
 
         local selectedItems = getSelectedItems()
         if #selectedItems == 0 then
+            selectVisibleItems(true)
+            selectedItems = getSelectedItems()
+        end
+        if #selectedItems == 0 then
             setStatus("Tidak ada item terpilih")
             return false
         end
@@ -1412,7 +1467,7 @@ local function createMailGui()
                     if not ok then
                         setStatus("Auto Gift gagal, menunggu ulang...")
                     end
-                    task.wait(2.5)
+                    task.wait(1.5)
                 end
             end
             autoRunning = false
