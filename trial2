@@ -446,6 +446,7 @@ local autoBuyGearsEnabled = false
 local autoClaimSeedDropEnabled = false
 local autoSkipTutorialEnabled = false
 local autoLoopRunning = false
+local scriptActive = true
 local autoBuySeedTargets = {}
 local autoBuyGearTargets = {}
 
@@ -739,17 +740,21 @@ local function isBlockedText(text)
         or text:find("close", 1, true)
 end
 
-local function findBuyButtonForItem(itemName)
+local function findBuyButtonForItem(itemName, categoryHint)
     if not PlayerGui or itemName == "" then
         return nil
     end
-    local query = itemName:lower()
+    local query = normalizeText(itemName):lower()
+    local category = normalizeText(categoryHint or ""):lower()
     local bestButton = nil
     local bestScore = -1
     local buttons = {}
     for _, obj in ipairs(PlayerGui:GetDescendants()) do
-        if (obj:IsA("GuiButton") or obj:IsA("ImageButton")) and obj.Visible and obj.Active then
-            table.insert(buttons, obj)
+        if (obj:IsA("GuiButton") or obj:IsA("ImageButton")) and obj.Visible and obj.Active and not isOwnGui(obj) then
+            local text = collectGuiText(obj)
+            if text ~= "" then
+                table.insert(buttons, obj)
+            end
         end
     end
 
@@ -767,23 +772,30 @@ local function findBuyButtonForItem(itemName)
             ancestor = ancestor.Parent
         end
         local score = 0
-        if isPurchaseLikeText(text) then
+        local containsItem = text:find(query, 1, true) or name:find(query, 1, true) or parentText:find(query, 1, true) or ancestorText:find(query, 1, true)
+        if containsItem then
+            score = score + 8
+        end
+        if text:find("buy", 1, true) or text:find("purchase", 1, true) or text:find("shop", 1, true)
+            or text:find("get", 1, true) or text:find("claim", 1, true) or text:find("collect", 1, true) then
+            score = score + 4
+        end
+        if parentText:find("shop", 1, true) or parentText:find("store", 1, true) or parentText:find("market", 1, true)
+            or parentText:find("catalog", 1, true) or parentText:find("buy", 1, true) then
             score = score + 3
         end
-        if isPurchaseLikeText(parentText) then
+        if ancestorText:find("shop", 1, true) or ancestorText:find("store", 1, true) or ancestorText:find("market", 1, true)
+            or ancestorText:find("catalog", 1, true) or ancestorText:find("buy", 1, true) then
             score = score + 2
         end
-        if isPurchaseLikeText(ancestorText) then
-            score = score + 1
+        if category ~= "" and (text:find(category, 1, true) or parentText:find(category, 1, true) or ancestorText:find(category, 1, true)) then
+            score = score + 2
         end
-        if text:find(query, 1, true) or name:find(query, 1, true) or parentText:find(query, 1, true) or ancestorText:find(query, 1, true) then
-            score = score + 6
-        end
-        if text:find("buy", 1, true) and (parentText:find(query, 1, true) or ancestorText:find(query, 1, true)) then
+        if containsItem and (text:find("buy", 1, true) or parentText:find("buy", 1, true) or ancestorText:find("buy", 1, true)) then
             score = score + 4
         end
         if isBlockedText(text) or isBlockedText(parentText) or isBlockedText(ancestorText) then
-            score = score - 100
+            score = score - 120
         end
         if score > bestScore then
             bestScore = score
@@ -791,7 +803,7 @@ local function findBuyButtonForItem(itemName)
         end
     end
 
-    if bestButton and bestScore >= 6 then
+    if bestButton and bestScore >= 10 then
         return bestButton
     end
     return nil
@@ -805,7 +817,7 @@ local function autoBuySeedOrGear()
     if autoBuySeedsEnabled then
         for _, item in ipairs(SEED_DATABASE) do
             if autoBuySeedTargets[item] ~= false then
-                table.insert(candidates, {Name = item, Category = "Seeds"})
+                table.insert(candidates, {Name = item, Category = "Seed"})
             end
         end
     end
@@ -823,7 +835,7 @@ local function autoBuySeedOrGear()
         return false
     end
     for _, candidate in ipairs(candidates) do
-        local button = findBuyButtonForItem(candidate.Name)
+        local button = findBuyButtonForItem(candidate.Name, candidate.Category)
         if button then
             local success = fireGuiButton(button)
             if success then
@@ -839,7 +851,7 @@ local function autoClaimSeedDrop()
     if not autoClaimSeedDropEnabled then
         return false
     end
-    local target = findBuyButtonForItem("seed")
+    local target = findBuyButtonForItem("seed", "seed")
     if target then
         return fireGuiButton(target)
     end
@@ -863,7 +875,7 @@ local function startAutomationLoop()
     end
     autoLoopRunning = true
     task.spawn(function()
-        while autoBuySeedsEnabled or autoBuyGearsEnabled or autoClaimSeedDropEnabled or autoSkipTutorialEnabled do
+        while scriptActive and (autoBuySeedsEnabled or autoBuyGearsEnabled or autoClaimSeedDropEnabled or autoSkipTutorialEnabled) do
             if autoBuySeedsEnabled or autoBuyGearsEnabled then
                 local ok = autoBuySeedOrGear()
                 if ok then
@@ -898,6 +910,43 @@ local function createMailGui()
     screen.Name = "MailGui"
     screen.ResetOnSpawn = false
     screen.Parent = PlayerGui
+
+    local toggleScreen = Instance.new("ScreenGui")
+    toggleScreen.Name = "MailGuiToggle"
+    toggleScreen.ResetOnSpawn = false
+    toggleScreen.Parent = PlayerGui
+
+    local toggleButton = Instance.new("TextButton")
+    toggleButton.Name = "ToggleScriptButton"
+    toggleButton.Size = UDim2.new(0, 160, 0, 34)
+    toggleButton.Position = UDim2.new(0.5, -80, 0.02, 0)
+    toggleButton.BackgroundColor3 = Color3.fromRGB(90, 150, 90)
+    toggleButton.TextColor3 = Color3.fromRGB(245, 245, 245)
+    toggleButton.Font = Enum.Font.GothamBold
+    toggleButton.TextSize = 12
+    toggleButton.Text = "Close Script"
+    toggleButton.Parent = toggleScreen
+    Instance.new("UICorner", toggleButton).CornerRadius = UDim.new(0, 8)
+
+    local function setScriptUiVisible(visible)
+        screen.Enabled = visible
+        toggleButton.Text = visible and "Close Script" or "Open Script"
+        toggleButton.BackgroundColor3 = visible and Color3.fromRGB(175, 80, 80) or Color3.fromRGB(90, 150, 90)
+    end
+
+    toggleButton.Activated:Connect(function()
+        scriptActive = not scriptActive
+        setScriptUiVisible(scriptActive)
+        if not scriptActive then
+            autoBuySeedsEnabled = false
+            autoBuyGearsEnabled = false
+            autoClaimSeedDropEnabled = false
+            autoSkipTutorialEnabled = false
+        end
+        startAutomationLoop()
+    end)
+
+    setScriptUiVisible(true)
 
     local frame = Instance.new("Frame")
     frame.Name = "MainFrame"
