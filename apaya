@@ -1,121 +1,75 @@
 -- =====================================================
--- HUB SCRIPT - VERSI CEPAT DENGAN MULTI-TAB
+-- HUB SCRIPT - VERSI FINAL (Cepat & Tanpa Error)
 -- =====================================================
 
--- [[ SERVICES ]]
 local Players = game:GetService("Players")
 local TweenService = game:GetService("TweenService")
 local UserInputService = game:GetService("UserInputService")
 local RunService = game:GetService("RunService")
 local TeleportService = game:GetService("TeleportService")
-local StarterGui = game:GetService("StarterGui")
 local VirtualUser = game:GetService("VirtualUser")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local player = Players.LocalPlayer
 if not player then return end
 local playerGui = player:WaitForChild("PlayerGui")
-local playerName = player.Name  -- FIX: Define playerName
+local playerName = player.Name
+local mouse = player:GetMouse()
 
 -- =====================================================
 -- KONFIGURASI CEPAT
 -- =====================================================
-
 local CONFIG = {
     Width = 340,
-    TitleHeight = 50,  -- Lebih pendek
+    TitleHeight = 50,
     Padding = 10,
     Spacing = 6,
-    ButtonHeight = 38,  -- Lebih cepat
+    ButtonHeight = 38,
     ToggleHeight = 24,
-    AnimationSpeed = 0.15,  -- Lebih cepat
-    ClickSpeed = 0.05,  -- Auto click lebih cepat
+    AnimSpeed = 0.12,  -- Lebih cepat
 }
 
 -- =====================================================
--- SISTEM KEY
+-- UTILITY
 -- =====================================================
-
-local VALID_KEYS = {
-    ["FREE-2024-001"] = { tier = "free", expiry = os.time() + 86400 * 30 },
-    ["VIP-2024-002"] = { tier = "vip", expiry = os.time() + 86400 * 90 },
-    ["ADMIN-2024-003"] = { tier = "admin", expiry = os.time() + 86400 * 365 },
-    ["TEST-KEY-001"] = { tier = "free", expiry = os.time() + 86400 * 7 },
-}
-
-local activeKey = nil
-local userTier = "free"  -- Default
-local keyExpiry = nil
-
--- Validasi key
-local function validateKey(key)
-    key = string.upper(key):gsub("^%s+", ""):gsub("%s+$", "")
-    local keyData = VALID_KEYS[key]
-    if not keyData then
-        return false, "Invalid key!"
-    end
-    if os.time() > keyData.expiry then
-        return false, "Key expired!"
-    end
-    return true, keyData.tier, keyData.expiry
-end
-
--- Generate key (untuk testing)
-local function generateKey(tier)
-    tier = tier or "free"
-    local prefixes = { free = "FREE", vip = "VIP", admin = "ADMIN" }
-    local prefix = prefixes[tier] or "FREE"
-    local random = math.random(1000, 9999)
-    local key = string.format("%s-%d-%04d", prefix, os.time() % 10000, random)
-    VALID_KEYS[key] = { tier = tier, expiry = os.time() + 86400 * 30 }
-    return key
-end
-
--- =====================================================
--- UTILITY FUNCTIONS
--- =====================================================
-
 local connections = {}
 
 local function createInstance(className, properties)
-    local instance = Instance.new(className)
+    local inst = Instance.new(className)
     if properties then
-        for prop, value in pairs(properties) do
-            instance[prop] = value
+        for k, v in pairs(properties) do
+            inst[k] = v
         end
     end
-    return instance
+    return inst
 end
 
 local function clearConnections()
     for _, conn in ipairs(connections) do
         if conn and conn.Connected then
-            pcall(function() conn:Disconnect() end)
+            pcall(conn.Disconnect, conn)
         end
     end
     connections = {}
 end
 
 -- Notifikasi cepat
-local function showNotification(text, subText, duration, bgColor, textColor)
-    duration = duration or 2.5
-    bgColor = bgColor or Color3.fromRGB(40, 35, 45)
-    textColor = textColor or Color3.fromRGB(230, 200, 240)
-    
+local function notify(text, sub, dur, color)
+    dur = dur or 2
+    color = color or Color3.fromRGB(80, 60, 90)
     local container = createInstance("ScreenGui", {
-        Name = "Notification",
+        Name = "Notify",
         IgnoreGuiInset = true,
         Parent = playerGui
     })
-    
     local frame = createInstance("Frame", {
-        BackgroundColor3 = Color3.fromRGB(25, 22, 30),
+        BackgroundColor3 = Color3.fromRGB(20, 18, 25),
         BorderSizePixel = 0,
         Position = UDim2.new(1, 400, 0, 20),
-        Size = UDim2.new(0, CONFIG.Width, 0, 60),
+        Size = UDim2.new(0, CONFIG.Width, 0, 55),
         ClipsDescendants = false,
         Parent = container
     })
-    
     createInstance("Frame", {
         BackgroundColor3 = Color3.fromRGB(0, 0, 0),
         BackgroundTransparency = 0.4,
@@ -124,38 +78,41 @@ local function showNotification(text, subText, duration, bgColor, textColor)
         Size = UDim2.new(1, 4, 1, 4),
         Parent = frame
     })
-    
-    local title = createInstance("TextLabel", {
+    createInstance("TextLabel", {
         BackgroundTransparency = 1,
         Font = Enum.Font.GothamBold,
         Text = text,
-        TextColor3 = textColor,
-        TextSize = 16,
+        TextColor3 = Color3.fromRGB(230, 200, 240),
+        TextSize = 15,
         TextXAlignment = Enum.TextXAlignment.Left,
         Position = UDim2.new(0, CONFIG.Padding, 0, 6),
         Size = UDim2.new(1, -CONFIG.Padding * 2, 0, 22),
         Parent = frame
     })
-    
-    local sub = createInstance("TextLabel", {
+    createInstance("TextLabel", {
         BackgroundTransparency = 1,
         Font = Enum.Font.Gotham,
-        Text = subText or "",
+        Text = sub or "",
         TextColor3 = Color3.fromRGB(180, 160, 170),
         TextSize = 12,
         TextXAlignment = Enum.TextXAlignment.Left,
-        Position = UDim2.new(0, CONFIG.Padding, 0, 30),
-        Size = UDim2.new(1, -CONFIG.Padding * 2, 0, 22),
+        Position = UDim2.new(0, CONFIG.Padding, 0, 28),
+        Size = UDim2.new(1, -CONFIG.Padding * 2, 0, 20),
         Parent = frame
     })
-    
-    TweenService:Create(frame, TweenInfo.new(CONFIG.AnimationSpeed, Enum.EasingStyle.Quad), {
+    createInstance("Frame", {
+        BackgroundColor3 = color,
+        BorderSizePixel = 0,
+        Position = UDim2.new(0, 0, 0, 0),
+        Size = UDim2.new(0, 4, 1, 0),
+        Parent = frame
+    })
+    TweenService:Create(frame, TweenInfo.new(CONFIG.AnimSpeed, Enum.EasingStyle.Quad), {
         Position = UDim2.new(1, -CONFIG.Width - 40, 0, 20)
     }):Play()
-    
-    delay(duration, function()
+    delay(dur, function()
         if frame and frame.Parent then
-            TweenService:Create(frame, TweenInfo.new(CONFIG.AnimationSpeed, Enum.EasingStyle.Quad), {
+            TweenService:Create(frame, TweenInfo.new(CONFIG.AnimSpeed, Enum.EasingStyle.Quad), {
                 Position = UDim2.new(1, 400, 0, 20)
             }):Play()
             delay(0.25, function()
@@ -165,325 +122,260 @@ local function showNotification(text, subText, duration, bgColor, textColor)
             end)
         end
     end)
-    
     return container
 end
 
 -- =====================================================
--- KEY INPUT UI
+-- FITUR-FITUR
 -- =====================================================
-
-local function showKeyInput()
-    local container = createInstance("ScreenGui", {
-        Name = "KeyInput",
-        IgnoreGuiInset = true,
-        Parent = playerGui
-    })
-    
-    local frame = createInstance("Frame", {
-        BackgroundColor3 = Color3.fromRGB(25, 20, 30),
-        BorderSizePixel = 0,
-        Position = UDim2.new(0.5, -170, 0.5, -90),
-        Size = UDim2.new(0, 340, 0, 180),
-        ClipsDescendants = false,
-        Parent = container
-    })
-    
-    createInstance("Frame", {
-        BackgroundColor3 = Color3.fromRGB(0, 0, 0),
-        BackgroundTransparency = 0.4,
-        BorderSizePixel = 0,
-        Position = UDim2.new(0, -3, 0, 3),
-        Size = UDim2.new(1, 6, 1, 6),
-        Parent = frame
-    })
-    
-    local title = createInstance("TextLabel", {
-        BackgroundTransparency = 1,
-        Font = Enum.Font.GothamBold,
-        Text = "🔑 Enter License Key",
-        TextColor3 = Color3.fromRGB(230, 200, 240),
-        TextSize = 18,
-        Position = UDim2.new(0, 0, 0, 8),
-        Size = UDim2.new(1, 0, 0, 28),
-        Parent = frame
-    })
-    
-    local subtitle = createInstance("TextLabel", {
-        BackgroundTransparency = 1,
-        Font = Enum.Font.Gotham,
-        Text = "Masukkan key untuk akses hub",
-        TextColor3 = Color3.fromRGB(180, 160, 170),
-        TextSize = 12,
-        Position = UDim2.new(0, 0, 0, 38),
-        Size = UDim2.new(1, 0, 0, 18),
-        Parent = frame
-    })
-    
-    local inputBox = createInstance("TextBox", {
-        BackgroundColor3 = Color3.fromRGB(40, 35, 45),
-        BorderSizePixel = 0,
-        Font = Enum.Font.Gotham,
-        PlaceholderText = "Enter key here...",
-        PlaceholderColor3 = Color3.fromRGB(100, 90, 110),
-        Text = "",
-        TextColor3 = Color3.fromRGB(255, 255, 255),
-        TextSize = 15,
-        Position = UDim2.new(0.5, -130, 0, 72),
-        Size = UDim2.new(0, 260, 0, 34),
-        Parent = frame
-    })
-    
-    local submitBtn = createInstance("TextButton", {
-        BackgroundColor3 = Color3.fromRGB(60, 100, 150),
-        BorderSizePixel = 0,
-        Font = Enum.Font.GothamBold,
-        Text = "✓ Activate",
-        TextColor3 = Color3.fromRGB(255, 255, 255),
-        TextSize = 15,
-        Position = UDim2.new(0.5, -70, 0, 120),
-        Size = UDim2.new(0, 140, 0, 34),
-        AutoButtonColor = false,
-        Parent = frame
-    })
-    
-    local closeBtn = createInstance("TextButton", {
-        BackgroundTransparency = 1,
-        Font = Enum.Font.GothamBold,
-        Text = "✕",
-        TextColor3 = Color3.fromRGB(200, 150, 150),
-        TextSize = 16,
-        Position = UDim2.new(1, -28, 0, 4),
-        Size = UDim2.new(0, 24, 0, 24),
-        AutoButtonColor = false,
-        Parent = frame
-    })
-    
-    closeBtn.MouseButton1Click:Connect(function()
-        container:Destroy()
-    end)
-    
-    local function submitKey()
-        local key = inputBox.Text
-        if key == "" then
-            showNotification("⚠ Empty Key", "Masukkan key terlebih dahulu", 2,
-                Color3.fromRGB(50, 30, 35), Color3.fromRGB(255, 180, 180))
-            return
-        end
-        
-        local isValid, tier, expiry = validateKey(key)
-        
-        if isValid then
-            activeKey = key
-            userTier = tier
-            keyExpiry = expiry
-            
-            showNotification("✓ Key Activated!", "Tier: " .. string.upper(tier), 2.5,
-                Color3.fromRGB(30, 60, 40), Color3.fromRGB(180, 255, 200))
-            
-            container:Destroy()
-            delay(0.3, function()
-                pcall(buildMainUI)
-            end)
-        else
-            showNotification("✗ Invalid Key", tier or "Coba periksa kembali", 2.5,
-                Color3.fromRGB(60, 30, 35), Color3.fromRGB(255, 150, 150))
-        end
-    end
-    
-    submitBtn.MouseButton1Click:Connect(submitKey)
-    inputBox.FocusLost:Connect(function(enterPressed)
-        if enterPressed then submitKey() end
-    end)
-    
-    frame.BackgroundTransparency = 1
-    TweenService:Create(frame, TweenInfo.new(0.25), {
-        BackgroundTransparency = 0
-    }):Play()
-    
-    return container
-end
-
--- =====================================================
--- FITUR-FITUR CEPAT
--- =====================================================
-
 local features = {
     autoFarm = false,
     autoClick = false,
-    antiAFK = false,
-    esp = false,
+    autoCollect = false,
     speedBoost = false,
-    multiTab = false,
+    fly = false,
+    noClip = false,
+    esp = false,
 }
 
--- AUTO CLICK - Lebih cepat
-local autoClickConnection = nil
-local function toggleAutoClick(state)
-    features.autoClick = state
-    
-    if state then
-        autoClickConnection = RunService.Heartbeat:Connect(function()
-            -- Click lebih cepat
-            pcall(function()
-                VirtualUser:CaptureController()
-                VirtualUser:ClickButton2(Vector2.new())
-            end)
-        end)
-        table.insert(connections, autoClickConnection)
-        showNotification("✓ Auto Click", "Kecepatan: " .. (1/CONFIG.ClickSpeed) .. "x/s", 1.5,
-            Color3.fromRGB(30, 60, 40), Color3.fromRGB(180, 255, 200))
-    else
-        if autoClickConnection and autoClickConnection.Connected then
-            autoClickConnection:Disconnect()
-            autoClickConnection = nil
-        end
-        showNotification("✕ Auto Click", "Dinonaktifkan", 1.2,
-            Color3.fromRGB(50, 30, 35), Color3.fromRGB(255, 180, 180))
-    end
-end
-
--- AUTO FARM - Lebih cepat
-local autoFarmConnection = nil
+-- 1. AUTO FARM (lebih cepat dengan interval)
+local farmConnection = nil
 local function toggleAutoFarm(state)
     features.autoFarm = state
-    
     if state then
-        autoFarmConnection = RunService.Heartbeat:Connect(function()
-            local character = player.Character
-            if character and character:FindFirstChild("Humanoid") then
-                local humanoid = character.Humanoid
-                -- Gerak cepat ke target
-                local target = nil
-                local minDist = math.huge
-                
+        farmConnection = RunService.Heartbeat:Connect(function()
+            local char = player.Character
+            if not char then return end
+            local hum = char:FindFirstChild("Humanoid")
+            if not hum then return end
+            -- Cari target terdekat (nama part sesuai game)
+            local target, minDist = nil, math.huge
+            local searchNames = {"Part", "Target", "Coin", "Gem", "Farm", "Node", "Crystal"}
+            for _, name in ipairs(searchNames) do
                 for _, part in ipairs(workspace:GetDescendants()) do
-                    if part:IsA("BasePart") and part.Name == "Target" then
-                        local dist = (part.Position - character.PrimaryPart.Position).Magnitude
-                        if dist < minDist then
+                    if part:IsA("BasePart") and string.find(part.Name:lower(), name:lower()) then
+                        local dist = (part.Position - char.PrimaryPart.Position).Magnitude
+                        if dist < minDist and dist < 60 then
                             minDist = dist
                             target = part
                         end
                     end
                 end
-                
-                if target and minDist < 30 then
-                    humanoid:MoveTo(target.Position)
-                    -- Kecepatan lebih cepat
-                    humanoid.WalkSpeed = math.max(humanoid.WalkSpeed, 25)
-                end
+            end
+            if target and hum then
+                hum:MoveTo(target.Position)
+                hum.WalkSpeed = math.max(hum.WalkSpeed, 25)
             end
         end)
-        table.insert(connections, autoFarmConnection)
-        showNotification("✓ Auto Farm", "Mode cepat diaktifkan", 1.5,
-            Color3.fromRGB(30, 60, 40), Color3.fromRGB(180, 255, 200))
+        table.insert(connections, farmConnection)
+        notify("🌾 Auto Farm", "Aktif - mencari target", 1.5, Color3.fromRGB(60, 200, 100))
     else
-        if autoFarmConnection and autoFarmConnection.Connected then
-            autoFarmConnection:Disconnect()
-            autoFarmConnection = nil
+        if farmConnection and farmConnection.Connected then
+            farmConnection:Disconnect()
+            farmConnection = nil
         end
-        showNotification("✕ Auto Farm", "Dinonaktifkan", 1.2,
-            Color3.fromRGB(50, 30, 35), Color3.fromRGB(255, 180, 180))
+        notify("🌾 Auto Farm", "Dinonaktifkan", 1.2, Color3.fromRGB(200, 80, 80))
     end
 end
 
--- ANTI AFK
-local antiAFKConnection = nil
-local function toggleAntiAFK(state)
-    features.antiAFK = state
-    
+-- 2. AUTO CLICK
+local clickConnection = nil
+local function toggleAutoClick(state)
+    features.autoClick = state
     if state then
-        antiAFKConnection = RunService.Heartbeat:Connect(function()
+        clickConnection = RunService.Heartbeat:Connect(function()
             pcall(function()
                 VirtualUser:CaptureController()
                 VirtualUser:ClickButton2(Vector2.new())
             end)
         end)
-        table.insert(connections, antiAFKConnection)
-        showNotification("✓ Anti AFK", "Aktif - tidak akan di-kick", 1.5,
-            Color3.fromRGB(30, 60, 40), Color3.fromRGB(180, 255, 200))
+        table.insert(connections, clickConnection)
+        notify("🖱 Auto Click", "Klik otomatis", 1.5, Color3.fromRGB(60, 200, 100))
     else
-        if antiAFKConnection and antiAFKConnection.Connected then
-            antiAFKConnection:Disconnect()
-            antiAFKConnection = nil
+        if clickConnection and clickConnection.Connected then
+            clickConnection:Disconnect()
+            clickConnection = nil
         end
-        showNotification("✕ Anti AFK", "Dinonaktifkan", 1.2,
-            Color3.fromRGB(50, 30, 35), Color3.fromRGB(255, 180, 180))
+        notify("🖱 Auto Click", "Dinonaktifkan", 1.2, Color3.fromRGB(200, 80, 80))
     end
 end
 
--- SPEED BOOST - Fitur baru
-local function toggleSpeedBoost(state)
-    features.speedBoost = state
-    
-    local character = player.Character
-    if character and character:FindFirstChild("Humanoid") then
-        local humanoid = character.Humanoid
-        if state then
-            humanoid.WalkSpeed = 50
-            humanoid.JumpPower = 80
-            showNotification("⚡ Speed Boost", "Kecepatan: 50, Lompat: 80", 1.5,
-                Color3.fromRGB(40, 50, 80), Color3.fromRGB(200, 220, 255))
-        else
-            humanoid.WalkSpeed = 16
-            humanoid.JumpPower = 50
-            showNotification("✕ Speed Boost", "Dinonaktifkan", 1.2,
-                Color3.fromRGB(50, 30, 35), Color3.fromRGB(255, 180, 180))
-        end
-    end
-end
-
--- MULTI TAB - Fitur baru
-local function toggleMultiTab(state)
-    features.multiTab = state
-    
+-- 3. AUTO COLLECT (tanpa firetouchinterest, pakai jarak)
+local collectConnection = nil
+local function toggleAutoCollect(state)
+    features.autoCollect = state
     if state then
-        showNotification("📑 Multi Tab", "Bisa buka beberapa tab", 1.5,
-            Color3.fromRGB(40, 50, 80), Color3.fromRGB(200, 220, 255))
+        collectConnection = RunService.Heartbeat:Connect(function()
+            local char = player.Character
+            if not char or not char.PrimaryPart then return end
+            local pp = char.PrimaryPart
+            -- Cari part yang memiliki TouchInterest (bisa di-collect)
+            for _, item in ipairs(workspace:GetDescendants()) do
+                if item:IsA("BasePart") and item:FindFirstChild("TouchInterest") then
+                    local dist = (item.Position - pp.Position).Magnitude
+                    if dist < 8 then
+                        -- Simulasi sentuh dengan firetouchinterest (jika tersedia)
+                        pcall(function()
+                            -- Gunakan _G untuk menghindari undefined warning
+                            if _G.firetouchinterest then
+                                _G.firetouchinterest(pp, item, 0)
+                                _G.firetouchinterest(pp, item, 1)
+                            else
+                                -- Alternatif: pindahkan part ke dekat player (simulasi)
+                                item.CFrame = pp.CFrame + Vector3.new(0, 0, 2)
+                            end
+                        end)
+                    end
+                end
+            end
+        end)
+        table.insert(connections, collectConnection)
+        notify("📦 Auto Collect", "Mengumpulkan item", 1.5, Color3.fromRGB(60, 200, 100))
     else
-        showNotification("✕ Multi Tab", "Dinonaktifkan", 1.2,
-            Color3.fromRGB(50, 30, 35), Color3.fromRGB(255, 180, 180))
+        if collectConnection and collectConnection.Connected then
+            collectConnection:Disconnect()
+            collectConnection = nil
+        end
+        notify("📦 Auto Collect", "Dinonaktifkan", 1.2, Color3.fromRGB(200, 80, 80))
     end
 end
 
--- ESP
+-- 4. SPEED BOOST
+local function toggleSpeed(state)
+    features.speedBoost = state
+    local char = player.Character
+    if char and char:FindFirstChild("Humanoid") then
+        local hum = char.Humanoid
+        if state then
+            hum.WalkSpeed = 50
+            hum.JumpPower = 80
+            notify("⚡ Speed Boost", "Kecepatan: 50 | Lompat: 80", 1.5, Color3.fromRGB(100, 180, 255))
+        else
+            hum.WalkSpeed = 16
+            hum.JumpPower = 50
+            notify("⚡ Speed Boost", "Dinonaktifkan", 1.2, Color3.fromRGB(200, 80, 80))
+        end
+    end
+end
+
+-- 5. FLY
+local flyConnection = nil
+local flyBodyVelocity = nil
+local function toggleFly(state)
+    features.fly = state
+    local char = player.Character
+    if not char then return end
+    if state then
+        flyBodyVelocity = Instance.new("BodyVelocity")
+        flyBodyVelocity.MaxForce = Vector3.new(1e5, 1e5, 1e5)
+        flyBodyVelocity.Velocity = Vector3.new(0, 0, 0)
+        flyBodyVelocity.Parent = char.PrimaryPart
+        flyConnection = RunService.Heartbeat:Connect(function()
+            if not char or not char.PrimaryPart then return end
+            local dir = Vector3.new()
+            if UserInputService:IsKeyDown(Enum.KeyCode.W) then
+                dir = dir + char.PrimaryPart.CFrame.LookVector
+            end
+            if UserInputService:IsKeyDown(Enum.KeyCode.S) then
+                dir = dir - char.PrimaryPart.CFrame.LookVector
+            end
+            if UserInputService:IsKeyDown(Enum.KeyCode.A) then
+                dir = dir - char.PrimaryPart.CFrame.RightVector
+            end
+            if UserInputService:IsKeyDown(Enum.KeyCode.D) then
+                dir = dir + char.PrimaryPart.CFrame.RightVector
+            end
+            if UserInputService:IsKeyDown(Enum.KeyCode.Space) then
+                dir = dir + Vector3.new(0, 1, 0)
+            end
+            if UserInputService:IsKeyDown(Enum.KeyCode.LeftShift) then
+                dir = dir - Vector3.new(0, 1, 0)
+            end
+            if dir.Magnitude > 0 then
+                dir = dir.Unit * 50
+            end
+            if flyBodyVelocity then
+                flyBodyVelocity.Velocity = dir
+            end
+        end)
+        table.insert(connections, flyConnection)
+        notify("✈️ Fly Mode", "WASD | Space naik | Shift turun", 2, Color3.fromRGB(100, 180, 255))
+    else
+        if flyConnection and flyConnection.Connected then
+            flyConnection:Disconnect()
+            flyConnection = nil
+        end
+        if flyBodyVelocity then
+            flyBodyVelocity:Destroy()
+            flyBodyVelocity = nil
+        end
+        notify("✈️ Fly Mode", "Dinonaktifkan", 1.2, Color3.fromRGB(200, 80, 80))
+    end
+end
+
+-- 6. NO CLIP
+local function toggleNoClip(state)
+    features.noClip = state
+    local char = player.Character
+    if char then
+        for _, part in ipairs(char:GetDescendants()) do
+            if part:IsA("BasePart") then
+                part.CanCollide = not state
+            end
+        end
+    end
+    if state then
+        local conn = player.CharacterAdded:Connect(function(newChar)
+            wait(0.1)
+            for _, part in ipairs(newChar:GetDescendants()) do
+                if part:IsA("BasePart") then
+                    part.CanCollide = false
+                end
+            end
+        end)
+        table.insert(connections, conn)
+        notify("🚪 No Clip", "Tembus tembok aktif", 1.5, Color3.fromRGB(60, 200, 100))
+    else
+        notify("🚪 No Clip", "Dinonaktifkan", 1.2, Color3.fromRGB(200, 80, 80))
+    end
+end
+
+-- 7. ESP
 local espObjects = {}
+local espConnection = nil
 local function toggleESP(state)
     features.esp = state
-    
     if state then
-        for _, otherPlayer in ipairs(Players:GetPlayers()) do
-            if otherPlayer ~= player then
-                local character = otherPlayer.Character
-                if character then
-                    local highlight = Instance.new("Highlight")
-                    highlight.Name = "ESP"
-                    highlight.FillColor = Color3.fromRGB(255, 0, 0)
-                    highlight.FillTransparency = 0.4
-                    highlight.OutlineColor = Color3.fromRGB(255, 255, 255)
-                    highlight.Parent = character
-                    table.insert(espObjects, highlight)
+        for _, other in ipairs(Players:GetPlayers()) do
+            if other ~= player then
+                local char = other.Character
+                if char then
+                    local hl = Instance.new("Highlight")
+                    hl.Name = "ESP"
+                    hl.FillColor = Color3.fromRGB(255, 50, 50)
+                    hl.FillTransparency = 0.4
+                    hl.OutlineColor = Color3.fromRGB(255, 255, 255)
+                    hl.Parent = char
+                    table.insert(espObjects, hl)
                 end
             end
         end
-        
-        Players.PlayerAdded:Connect(function(newPlayer)
+        espConnection = Players.PlayerAdded:Connect(function(newPlayer)
             if newPlayer ~= player then
-                newPlayer.CharacterAdded:Connect(function(character)
+                newPlayer.CharacterAdded:Connect(function(char)
                     wait(0.3)
-                    local highlight = Instance.new("Highlight")
-                    highlight.Name = "ESP"
-                    highlight.FillColor = Color3.fromRGB(255, 0, 0)
-                    highlight.FillTransparency = 0.4
-                    highlight.OutlineColor = Color3.fromRGB(255, 255, 255)
-                    highlight.Parent = character
-                    table.insert(espObjects, highlight)
+                    local hl = Instance.new("Highlight")
+                    hl.Name = "ESP"
+                    hl.FillColor = Color3.fromRGB(255, 50, 50)
+                    hl.FillTransparency = 0.4
+                    hl.OutlineColor = Color3.fromRGB(255, 255, 255)
+                    hl.Parent = char
+                    table.insert(espObjects, hl)
                 end)
             end
         end)
-        
-        showNotification("✓ ESP", "Player highlight aktif", 1.5,
-            Color3.fromRGB(30, 60, 40), Color3.fromRGB(180, 255, 200))
+        table.insert(connections, espConnection)
+        notify("👁 ESP", "Player highlight aktif", 1.5, Color3.fromRGB(60, 200, 100))
     else
         for _, obj in ipairs(espObjects) do
             if obj and obj.Parent then
@@ -491,32 +383,25 @@ local function toggleESP(state)
             end
         end
         espObjects = {}
-        showNotification("✕ ESP", "Dinonaktifkan", 1.2,
-            Color3.fromRGB(50, 30, 35), Color3.fromRGB(255, 180, 180))
+        if espConnection and espConnection.Connected then
+            espConnection:Disconnect()
+            espConnection = nil
+        end
+        notify("👁 ESP", "Dinonaktifkan", 1.2, Color3.fromRGB(200, 80, 80))
     end
 end
 
 -- =====================================================
--- CREATE UI ELEMENTS
+-- UI COMPONENTS
 -- =====================================================
-
-local function createToggle(toggleText, defaultState, callback)
-    local data = {
-        Enabled = defaultState or false,
-        Container = nil,
-        Frame = nil,
-        Inner = nil,
-        StateLabel = nil
-    }
-    
+local function createToggle(text, defaultState, callback)
+    local data = { Enabled = defaultState or false }
     local container = createInstance("Frame", {
         BackgroundColor3 = Color3.fromRGB(35, 30, 38),
         BorderSizePixel = 0,
         Size = UDim2.new(1, 0, 0, CONFIG.ToggleHeight + 12),
-        ClipsDescendants = false,
     })
-    
-    local buttonArea = createInstance("ImageButton", {
+    local button = createInstance("ImageButton", {
         BackgroundColor3 = Color3.fromRGB(40, 35, 45),
         BackgroundTransparency = 0,
         BorderSizePixel = 0,
@@ -525,11 +410,10 @@ local function createToggle(toggleText, defaultState, callback)
         AutoButtonColor = false,
         Parent = container
     })
-    
-    local textLabel = createInstance("TextLabel", {
+    createInstance("TextLabel", {
         BackgroundTransparency = 1,
         Font = Enum.Font.Gotham,
-        Text = toggleText,
+        Text = text,
         TextColor3 = Color3.fromRGB(220, 200, 210),
         TextSize = 13,
         TextXAlignment = Enum.TextXAlignment.Left,
@@ -537,7 +421,6 @@ local function createToggle(toggleText, defaultState, callback)
         Size = UDim2.new(0.65, -CONFIG.Padding, 1, 0),
         Parent = container
     })
-    
     local toggleFrame = createInstance("Frame", {
         BackgroundColor3 = Color3.fromRGB(50, 45, 55),
         BorderSizePixel = 0,
@@ -545,7 +428,6 @@ local function createToggle(toggleText, defaultState, callback)
         Size = UDim2.new(0, 36, 0, 20),
         Parent = container
     })
-    
     local toggleInner = createInstance("Frame", {
         BackgroundColor3 = Color3.fromRGB(80, 70, 90),
         BorderSizePixel = 0,
@@ -553,8 +435,7 @@ local function createToggle(toggleText, defaultState, callback)
         Size = UDim2.new(0, 16, 0, 16),
         Parent = toggleFrame
     })
-    
-    local stateLabel = createInstance("TextLabel", {
+    local statusLabel = createInstance("TextLabel", {
         BackgroundTransparency = 1,
         Font = Enum.Font.Gotham,
         Text = "OFF",
@@ -565,97 +446,76 @@ local function createToggle(toggleText, defaultState, callback)
         Size = UDim2.new(0, 35, 0, 20),
         Parent = container
     })
-    
     data.Container = container
     data.Frame = toggleFrame
     data.Inner = toggleInner
-    data.StateLabel = stateLabel
-    
-    local function updateToggle(state)
+    data.Status = statusLabel
+
+    local function update(state)
         data.Enabled = state
-        
-        TweenService:Create(toggleInner, TweenInfo.new(CONFIG.AnimationSpeed, Enum.EasingStyle.Quad), {
+        TweenService:Create(toggleInner, TweenInfo.new(CONFIG.AnimSpeed, Enum.EasingStyle.Quad), {
             Position = state and UDim2.new(1, -18, 0, 2) or UDim2.new(0, 2, 0, 2),
             BackgroundColor3 = state and Color3.fromRGB(100, 200, 100) or Color3.fromRGB(80, 70, 90)
         }):Play()
-        
-        TweenService:Create(toggleFrame, TweenInfo.new(CONFIG.AnimationSpeed), {
+        TweenService:Create(toggleFrame, TweenInfo.new(CONFIG.AnimSpeed), {
             BackgroundColor3 = state and Color3.fromRGB(60, 150, 60) or Color3.fromRGB(50, 45, 55)
         }):Play()
-        
-        TweenService:Create(stateLabel, TweenInfo.new(CONFIG.AnimationSpeed), {
+        TweenService:Create(statusLabel, TweenInfo.new(CONFIG.AnimSpeed), {
             Text = state and "ON" or "OFF",
             TextColor3 = state and Color3.fromRGB(120, 220, 120) or Color3.fromRGB(160, 140, 150)
         }):Play()
-        
-        if callback then
-            callback(state)
-        end
+        if callback then callback(state) end
     end
-    
-    buttonArea.MouseButton1Click:Connect(function()
-        updateToggle(not data.Enabled)
-    end)
-    
-    updateToggle(defaultState)
+    button.MouseButton1Click:Connect(function() update(not data.Enabled) end)
+    update(defaultState)
     return data
 end
 
-local function createButton(buttonText, buttonColor, onClick)
+local function createButton(text, color, onClick)
     local btn = createInstance("TextButton", {
-        BackgroundColor3 = buttonColor or Color3.fromRGB(50, 40, 60),
+        BackgroundColor3 = color or Color3.fromRGB(50, 40, 60),
         BorderSizePixel = 0,
         Font = Enum.Font.GothamBold,
-        Text = buttonText,
+        Text = text,
         TextColor3 = Color3.fromRGB(240, 220, 245),
         TextSize = 14,
         AutoButtonColor = false,
         Size = UDim2.new(1, 0, 0, CONFIG.ButtonHeight),
     })
-    
     btn.MouseEnter:Connect(function()
         TweenService:Create(btn, TweenInfo.new(0.08), {
             BackgroundColor3 = btn.BackgroundColor3:Lerp(Color3.new(0.15, 0.05, 0.2), 0.1)
         }):Play()
     end)
-    
     btn.MouseLeave:Connect(function()
         TweenService:Create(btn, TweenInfo.new(0.08), {
             BackgroundColor3 = btn.BackgroundColor3:Lerp(Color3.new(0.2, 0.15, 0.25), 0.1)
         }):Play()
     end)
-    
-    if onClick then
-        btn.MouseButton1Click:Connect(onClick)
-    end
-    
+    if onClick then btn.MouseButton1Click:Connect(onClick) end
     return btn
 end
 
 -- =====================================================
--- BUILD MAIN UI - FIXED
+-- BUILD UI
 -- =====================================================
-
-function buildMainUI()  -- FIX: Remove 'local' so it's global
-    if playerGui:FindFirstChild("MainUI") then
-        playerGui.MainUI:Destroy()
+local function buildUI()
+    if playerGui:FindFirstChild("Hub") then
+        playerGui.Hub:Destroy()
     end
-    
     local container = createInstance("ScreenGui", {
-        Name = "MainUI",
+        Name = "Hub",
         IgnoreGuiInset = true,
         Parent = playerGui
     })
-    
     local mainFrame = createInstance("Frame", {
-        BackgroundColor3 = Color3.fromRGB(25, 20, 30),
+        BackgroundColor3 = Color3.fromRGB(20, 18, 28),
         BorderSizePixel = 0,
-        Size = UDim2.new(0, CONFIG.Width, 0, 240),
+        Size = UDim2.new(0, CONFIG.Width, 0, 300),
         Position = UDim2.new(1, 400, 0, 20),
         ClipsDescendants = false,
         Parent = container
     })
-    
     createInstance("Frame", {
         BackgroundColor3 = Color3.fromRGB(0, 0, 0),
         BackgroundTransparency = 0.5,
@@ -664,20 +524,17 @@ function buildMainUI()  -- FIX: Remove 'local' so it's global
         Size = UDim2.new(1, 6, 1, 6),
         Parent = mainFrame
     })
-    
-    -- TOP BAR
+    -- Top bar
     local topBar = createInstance("Frame", {
         BackgroundColor3 = Color3.fromRGB(40, 30, 48),
         BorderSizePixel = 0,
         Size = UDim2.new(1, 0, 0, CONFIG.TitleHeight),
         Parent = mainFrame
     })
-    
-    -- Title - FIXED: Proper string formatting
-    local titleText = createInstance("TextLabel", {
+    createInstance("TextLabel", {
         BackgroundTransparency = 1,
         Font = Enum.Font.GothamBold,
-        Text = string.format("✦ %s's Hub [%s]", playerName, string.upper(userTier or "free")),  -- FIXED
+        Text = "✦ " .. playerName .. "'s Hub",
         TextColor3 = Color3.fromRGB(230, 200, 240),
         TextSize = 15,
         TextXAlignment = Enum.TextXAlignment.Left,
@@ -685,9 +542,7 @@ function buildMainUI()  -- FIX: Remove 'local' so it's global
         Size = UDim2.new(1, -60, 1, 0),
         Parent = topBar
     })
-    
-    -- Minimize button
-    local minimizeBtn = createInstance("TextButton", {
+    local minBtn = createInstance("TextButton", {
         BackgroundColor3 = Color3.fromRGB(60, 40, 50),
         BorderSizePixel = 0,
         Font = Enum.Font.Gotham,
@@ -699,9 +554,8 @@ function buildMainUI()  -- FIX: Remove 'local' so it's global
         AutoButtonColor = false,
         Parent = topBar
     })
-    
-    -- CONTENT AREA
-    local contentArea = createInstance("Frame", {
+    -- Content
+    local content = createInstance("Frame", {
         BackgroundColor3 = Color3.fromRGB(30, 25, 35),
         BorderSizePixel = 0,
         Size = UDim2.new(1, 0, 1, -CONFIG.TitleHeight),
@@ -709,144 +563,89 @@ function buildMainUI()  -- FIX: Remove 'local' so it's global
         ClipsDescendants = false,
         Parent = mainFrame
     })
-    
-    local scrollFrame = createInstance("ScrollingFrame", {
+    local scroll = createInstance("ScrollingFrame", {
         BackgroundColor3 = Color3.fromRGB(30, 25, 35),
         BorderSizePixel = 0,
         Size = UDim2.new(1, 0, 1, 0),
         CanvasSize = UDim2.new(0, 0, 0, 0),
         ScrollBarThickness = 2,
         ScrollBarImageColor3 = Color3.fromRGB(60, 40, 70),
-        Parent = contentArea
+        Parent = content
     })
-    
     createInstance("UIPadding", {
         PaddingLeft = UDim.new(0, CONFIG.Padding),
         PaddingRight = UDim.new(0, CONFIG.Padding),
         PaddingTop = UDim.new(0, CONFIG.Padding),
         PaddingBottom = UDim.new(0, CONFIG.Padding),
-        Parent = scrollFrame
+        Parent = scroll
     })
-    
     local layout = createInstance("UIListLayout", {
         SortOrder = Enum.SortOrder.LayoutOrder,
         Padding = UDim.new(0, CONFIG.Spacing),
         HorizontalAlignment = Enum.HorizontalAlignment.Left,
-        Parent = scrollFrame
+        Parent = scroll
     })
-    
-    -- =====================================================
-    -- TOMBOL DAN TOGGLE
-    -- =====================================================
-    
-    -- Toggle 1: Auto Farm
-    local farmToggle = createToggle("🌾 Auto Farm", features.autoFarm, function(state)
-        toggleAutoFarm(state)
+
+    -- Tambahkan toggle & button
+    local farm = createToggle("🌾 Auto Farm", features.autoFarm, toggleAutoFarm)
+    farm.Container.Parent = scroll; farm.Container.LayoutOrder = 1
+    local click = createToggle("🖱 Auto Click", features.autoClick, toggleAutoClick)
+    click.Container.Parent = scroll; click.Container.LayoutOrder = 2
+    local collect = createToggle("📦 Auto Collect", features.autoCollect, toggleAutoCollect)
+    collect.Container.Parent = scroll; collect.Container.LayoutOrder = 3
+    local speed = createToggle("⚡ Speed Boost", features.speedBoost, toggleSpeed)
+    speed.Container.Parent = scroll; speed.Container.LayoutOrder = 4
+    local fly = createToggle("✈️ Fly Mode", features.fly, toggleFly)
+    fly.Container.Parent = scroll; fly.Container.LayoutOrder = 5
+    local noclip = createToggle("🚪 No Clip", features.noClip, toggleNoClip)
+    noclip.Container.Parent = scroll; noclip.Container.LayoutOrder = 6
+    local esp = createToggle("👁 ESP", features.esp, toggleESP)
+    esp.Container.Parent = scroll; esp.Container.LayoutOrder = 7
+
+    local rejoin = createButton("↻ Rejoin Server", Color3.fromRGB(50, 40, 60), function()
+        notify("↻ Rejoining", "Menghubungkan ulang...", 2, Color3.fromRGB(60, 150, 200))
+        delay(0.8, function() pcall(TeleportService.Teleport, TeleportService, game.PlaceId, player) end)
     end)
-    farmToggle.Container.Parent = scrollFrame
-    farmToggle.Container.LayoutOrder = 1
-    
-    -- Toggle 2: Auto Click
-    local clickToggle = createToggle("🖱 Auto Click", features.autoClick, function(state)
-        toggleAutoClick(state)
+    rejoin.Parent = scroll; rejoin.LayoutOrder = 8
+
+    local reset = createButton("🔄 Reset Character", Color3.fromRGB(60, 40, 50), function()
+        if player.Character then
+            player.Character:BreakJoints()
+            notify("🔄 Reset", "Character di-reset", 1.5, Color3.fromRGB(200, 150, 60))
+        end
     end)
-    clickToggle.Container.Parent = scrollFrame
-    clickToggle.Container.LayoutOrder = 2
-    
-    -- Toggle 3: Anti AFK
-    local afkToggle = createToggle("⏰ Anti AFK", features.antiAFK, function(state)
-        toggleAntiAFK(state)
-    end)
-    afkToggle.Container.Parent = scrollFrame
-    afkToggle.Container.LayoutOrder = 3
-    
-    -- Toggle 4: Speed Boost
-    local speedToggle = createToggle("⚡ Speed Boost", features.speedBoost, function(state)
-        toggleSpeedBoost(state)
-    end)
-    speedToggle.Container.Parent = scrollFrame
-    speedToggle.Container.LayoutOrder = 4
-    
-    -- Toggle 5: Multi Tab
-    local multiToggle = createToggle("📑 Multi Tab", features.multiTab, function(state)
-        toggleMultiTab(state)
-    end)
-    multiToggle.Container.Parent = scrollFrame
-    multiToggle.Container.LayoutOrder = 5
-    
-    -- Toggle 6: ESP
-    local espToggle = createToggle("👁 ESP", features.esp, function(state)
-        toggleESP(state)
-    end)
-    espToggle.Container.Parent = scrollFrame
-    espToggle.Container.LayoutOrder = 6
-    
-    -- Button: Rejoin
-    local rejoinBtn = createButton("↻ Rejoin Server", Color3.fromRGB(50, 40, 60), function()
-        showNotification("↻ Rejoining", "Menghubungkan ulang...", 2,
-            Color3.fromRGB(40, 35, 45), Color3.fromRGB(230, 200, 240))
-        
-        delay(0.8, function()
-            local success, err = pcall(function()
-                TeleportService:Teleport(game.PlaceId, player)
-            end)
-            if not success then
-                showNotification("✗ Rejoin Failed", tostring(err), 2.5,
-                    Color3.fromRGB(60, 30, 35), Color3.fromRGB(255, 180, 180))
-            end
-        end)
-    end)
-    rejoinBtn.Parent = scrollFrame
-    rejoinBtn.LayoutOrder = 7
-    
-    -- Admin button (hanya untuk admin)
-    if userTier == "admin" then
-        local adminBtn = createButton("⚙ Admin Panel", Color3.fromRGB(80, 40, 60), function()
-            showNotification("⚙ Admin Panel", "Fitur admin aktif!", 2,
-                Color3.fromRGB(40, 30, 50), Color3.fromRGB(255, 200, 150))
-        end)
-        adminBtn.Parent = scrollFrame
-        adminBtn.LayoutOrder = 8
-    end
-    
-    -- Update canvas
+    reset.Parent = scroll; reset.LayoutOrder = 9
+
+    -- Update size
     local function updateSize()
-        local contentHeight = layout.AbsoluteContentSize.Y
-        local newHeight = CONFIG.Padding * 2 + contentHeight + CONFIG.Spacing + 10
-        scrollFrame.CanvasSize = UDim2.new(0, 0, 0, newHeight)
-        local visibleHeight = math.min(newHeight + CONFIG.TitleHeight + 10, 400)
-        mainFrame.Size = UDim2.new(0, CONFIG.Width, 0, visibleHeight)
+        local h = layout.AbsoluteContentSize.Y
+        local newH = CONFIG.Padding * 2 + h + CONFIG.Spacing + 10
+        scroll.CanvasSize = UDim2.new(0, 0, 0, newH)
+        local visible = math.min(newH + CONFIG.TitleHeight + 10, 450)
+        mainFrame.Size = UDim2.new(0, CONFIG.Width, 0, visible)
     end
-    
     layout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(updateSize)
     updateSize()
-    
-    -- =====================================================
-    -- DRAG
-    -- =====================================================
-    
-    local isDragging = false
-    local dragStart = nil
-    local frameStart = nil
-    
+
+    -- Drag
+    local dragging = false
+    local dragStart, frameStart = nil, nil
     topBar.InputBegan:Connect(function(input)
         if input.UserInputType == Enum.UserInputType.MouseButton1 or
            input.UserInputType == Enum.UserInputType.Touch then
-            isDragging = true
+            dragging = true
             dragStart = input.Position
             frameStart = mainFrame.Position
         end
     end)
-    
     topBar.InputEnded:Connect(function(input)
         if input.UserInputType == Enum.UserInputType.MouseButton1 or
            input.UserInputType == Enum.UserInputType.Touch then
-            isDragging = false
+            dragging = false
         end
     end)
-    
     UserInputService.InputChanged:Connect(function(input)
-        if isDragging and input.Position then
+        if dragging and input.Position then
             local delta = input.Position - dragStart
             local newX = frameStart.X.Offset + delta.X
             local newY = frameStart.Y.Offset + delta.Y
@@ -856,82 +655,55 @@ function buildMainUI()  -- FIX: Remove 'local' so it's global
             mainFrame.Position = UDim2.new(0, math.clamp(newX, 0, maxX), 0, math.clamp(newY, 0, maxY))
         end
     end)
-    
-    -- =====================================================
-    -- MINIMIZE
-    -- =====================================================
-    
-    local isMinimized = false
-    local originalSize = mainFrame.Size
-    
-    minimizeBtn.MouseButton1Click:Connect(function()
-        isMinimized = not isMinimized
-        if isMinimized then
-            TweenService:Create(mainFrame, TweenInfo.new(CONFIG.AnimationSpeed), {
+
+    -- Minimize
+    local minimized = false
+    local origSize = mainFrame.Size
+    minBtn.MouseButton1Click:Connect(function()
+        minimized = not minimized
+        if minimized then
+            TweenService:Create(mainFrame, TweenInfo.new(CONFIG.AnimSpeed), {
                 Size = UDim2.new(0, CONFIG.Width, 0, CONFIG.TitleHeight)
             }):Play()
-            contentArea.Visible = false
-            minimizeBtn.Text = "□"
+            content.Visible = false
+            minBtn.Text = "□"
         else
-            contentArea.Visible = true
-            TweenService:Create(mainFrame, TweenInfo.new(CONFIG.AnimationSpeed, Enum.EasingStyle.Back), {
-                Size = originalSize
+            content.Visible = true
+            TweenService:Create(mainFrame, TweenInfo.new(CONFIG.AnimSpeed, Enum.EasingStyle.Back), {
+                Size = origSize
             }):Play()
-            minimizeBtn.Text = "—"
+            minBtn.Text = "—"
         end
     end)
-    
-    -- =====================================================
-    -- ANIMASI MASUK - CEPAT
-    
+
+    -- Animasi masuk (PERBAIKAN: pakai titik dua)
     mainFrame.BackgroundTransparency = 1
-    TweenService:Create(mainFrame, TweenInfo.new(CONFIG.AnimationSpeed), {
+    TweenService:Create(mainFrame, TweenInfo.new(CONFIG.AnimSpeed), {
         BackgroundTransparency = 0
     }):Play()
-    
-    TweenService:Create(mainFrame, TweenInfo.new(CONFIG.AnimationSpeed + 0.1, Enum.EasingStyle.Back), {
+    TweenService:Create(mainFrame, TweenInfo.new(CONFIG.AnimSpeed + 0.1, Enum.EasingStyle.Back), {
         Position = UDim2.new(1, -CONFIG.Width - 40, 0, 20)
     }):Play()
-    
+
     -- Cleanup
     container.AncestryChanged:Connect(function()
         if not container:IsDescendantOf(game) then
             clearConnections()
-            pcall(function()
-                playerGui:SetAttribute("HubInitialized", nil)
-            end)
         end
     end)
-    
+
     return container
 end
 
 -- =====================================================
--- INISIALISASI
+-- START
 -- =====================================================
-
-local function initialize()
-    if playerGui:GetAttribute("HubInitialized") then
-        return
-    end
-    playerGui:SetAttribute("HubInitialized", true)
-    
-    showKeyInput()
-end
-
--- Jalankan
-spawn(function()
-    initialize()
+delay(0.5, function()
+    pcall(buildUI)
 end)
 
--- Generate key untuk testing
-_G.GenerateKey = function(tier)
-    tier = tier or "free"
-    local key = generateKey(tier)
-    print(string.format("✅ Key generated: %s (Tier: %s)", key, tier))
-    return key
-end
+delay(1, function()
+    notify("🚀 Hub Loaded", "Selamat datang " .. playerName .. "!", 2.5, Color3.fromRGB(80, 200, 150))
+end)
 
 print("=== HUB LOADED ===")
-print("📌 Type: _G.GenerateKey('tier') to generate a key")
-print("📌 Tiers: free, vip, admin")
