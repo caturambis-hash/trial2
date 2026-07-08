@@ -1239,30 +1239,52 @@ local function createMailGui()
         end
     end)
 
-    local function createDatabaseToggleList(panel, entries, stateTable, labelPrefix, enableFlag)
+    local function createItemSelectionPanel(panel, entries, stateTable, titleText, autoFlagKey)
         local title = Instance.new("TextLabel")
         title.Size = UDim2.new(1, 0, 0, 24)
         title.Position = UDim2.new(0, 0, 0, 0)
         title.BackgroundTransparency = 1
-        title.Text = labelPrefix .. " Database"
+        title.Text = titleText
         title.TextColor3 = Color3.fromRGB(235, 235, 235)
         title.Font = Enum.Font.GothamBold
         title.TextSize = 13
         title.Parent = panel
 
-        local toggleButton = Instance.new("TextButton")
-        toggleButton.Size = UDim2.new(1, 0, 0, 30)
-        toggleButton.Position = UDim2.new(0, 0, 0, 28)
-        toggleButton.BackgroundColor3 = Color3.fromRGB(70, 70, 80)
-        toggleButton.TextColor3 = Color3.fromRGB(245, 245, 245)
-        toggleButton.Font = Enum.Font.Gotham
-        toggleButton.TextSize = 12
-        toggleButton.Text = labelPrefix .. " Auto ON"
-        toggleButton.Parent = panel
-        Instance.new("UICorner", toggleButton).CornerRadius = UDim.new(0, 6)
+        local autoToggle = Instance.new("TextButton")
+        autoToggle.Size = UDim2.new(0.5, 0, 0, 30)
+        autoToggle.Position = UDim2.new(0, 0, 0, 28)
+        autoToggle.BackgroundColor3 = Color3.fromRGB(70, 70, 80)
+        autoToggle.TextColor3 = Color3.fromRGB(245, 245, 245)
+        autoToggle.Font = Enum.Font.Gotham
+        autoToggle.TextSize = 12
+        autoToggle.Text = titleText .. " Auto OFF"
+        autoToggle.Parent = panel
+        Instance.new("UICorner", autoToggle).CornerRadius = UDim.new(0, 6)
+
+        local selectAllButton = Instance.new("TextButton")
+        selectAllButton.Size = UDim2.new(0.25, 0, 0, 30)
+        selectAllButton.Position = UDim2.new(0.5, 0, 0, 28)
+        selectAllButton.BackgroundColor3 = Color3.fromRGB(70, 70, 80)
+        selectAllButton.TextColor3 = Color3.fromRGB(245, 245, 245)
+        selectAllButton.Font = Enum.Font.Gotham
+        selectAllButton.TextSize = 11
+        selectAllButton.Text = "Select All"
+        selectAllButton.Parent = panel
+        Instance.new("UICorner", selectAllButton).CornerRadius = UDim.new(0, 6)
+
+        local clearButton = Instance.new("TextButton")
+        clearButton.Size = UDim2.new(0.25, 0, 0, 30)
+        clearButton.Position = UDim2.new(0.75, 0, 0, 28)
+        clearButton.BackgroundColor3 = Color3.fromRGB(70, 70, 80)
+        clearButton.TextColor3 = Color3.fromRGB(245, 245, 245)
+        clearButton.Font = Enum.Font.Gotham
+        clearButton.TextSize = 11
+        clearButton.Text = "Clear"
+        clearButton.Parent = panel
+        Instance.new("UICorner", clearButton).CornerRadius = UDim.new(0, 6)
 
         local listFrame = Instance.new("ScrollingFrame")
-        listFrame.Size = UDim2.new(1, 0, 1, -72)
+        listFrame.Size = UDim2.new(1, 0, 1, -70)
         listFrame.Position = UDim2.new(0, 0, 0, 66)
         listFrame.BackgroundColor3 = Color3.fromRGB(38, 38, 38)
         listFrame.BorderSizePixel = 0
@@ -1272,20 +1294,42 @@ local function createMailGui()
         listLayout.Parent = listFrame
         listLayout.Padding = UDim.new(0, 6)
 
-        local function updateToggleState()
-            toggleButton.BackgroundColor3 = enableFlag and Color3.fromRGB(90, 150, 90) or Color3.fromRGB(70, 70, 80)
-            toggleButton.Text = labelPrefix .. (enableFlag and " Auto ON" or " Auto OFF")
+        local itemButtons = {}
+        local function setAutoState(isEnabled)
+            if autoFlagKey == "seed" then
+                autoBuySeedsEnabled = isEnabled
+            elseif autoFlagKey == "gear" then
+                autoBuyGearsEnabled = isEnabled
+            end
+            autoToggle.BackgroundColor3 = isEnabled and Color3.fromRGB(90, 150, 90) or Color3.fromRGB(70, 70, 80)
+            autoToggle.Text = titleText .. (isEnabled and " Auto ON" or " Auto OFF")
+            startAutomationLoop()
         end
 
-        toggleButton.Activated:Connect(function()
-            if labelPrefix == "Buy Seed" then
-                autoBuySeedsEnabled = not autoBuySeedsEnabled
-            else
-                autoBuyGearsEnabled = not autoBuyGearsEnabled
+        autoToggle.Activated:Connect(function()
+            if autoFlagKey == "seed" then
+                setAutoState(not autoBuySeedsEnabled)
+            elseif autoFlagKey == "gear" then
+                setAutoState(not autoBuyGearsEnabled)
             end
-            enableFlag = not enableFlag
-            updateToggleState()
-            startAutomationLoop()
+        end)
+
+        selectAllButton.Activated:Connect(function()
+            for _, entry in ipairs(entries) do
+                stateTable[entry] = true
+            end
+            for _, btn in ipairs(itemButtons) do
+                btn.BackgroundColor3 = Color3.fromRGB(90, 150, 90)
+            end
+        end)
+
+        clearButton.Activated:Connect(function()
+            for _, entry in ipairs(entries) do
+                stateTable[entry] = false
+            end
+            for _, btn in ipairs(itemButtons) do
+                btn.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+            end
         end)
 
         for _, entry in ipairs(entries) do
@@ -1295,24 +1339,29 @@ local function createMailGui()
             btn.TextColor3 = Color3.fromRGB(235, 235, 235)
             btn.Font = Enum.Font.Gotham
             btn.TextSize = 11
-            btn.Text = entry
+            btn.Text = "☐ " .. entry
             btn.Parent = listFrame
             Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 6)
             btn.Activated:Connect(function()
                 stateTable[entry] = not stateTable[entry]
+                btn.Text = (stateTable[entry] and "☑ " or "☐ ") .. entry
                 btn.BackgroundColor3 = stateTable[entry] and Color3.fromRGB(90, 150, 90) or Color3.fromRGB(60, 60, 60)
             end)
             stateTable[entry] = stateTable[entry] ~= false
+            btn.Text = (stateTable[entry] and "☑ " or "☐ ") .. entry
             btn.BackgroundColor3 = stateTable[entry] and Color3.fromRGB(90, 150, 90) or Color3.fromRGB(60, 60, 60)
+            table.insert(itemButtons, btn)
         end
 
-        updateToggleState()
+        if autoFlagKey == "seed" then
+            setAutoState(autoBuySeedsEnabled)
+        elseif autoFlagKey == "gear" then
+            setAutoState(autoBuyGearsEnabled)
+        end
     end
 
-    local buySeedEnable = autoBuySeedsEnabled
-    local buyGearEnable = autoBuyGearsEnabled
-    createDatabaseToggleList(buySeedPanel, SEED_DATABASE, autoBuySeedTargets, "Buy Seed", buySeedEnable)
-    createDatabaseToggleList(buyGearPanel, GEAR_DATABASE, autoBuyGearTargets, "Buy Gear", buyGearEnable)
+    createItemSelectionPanel(buySeedPanel, SEED_DATABASE, autoBuySeedTargets, "Buy Seed", "seed")
+    createItemSelectionPanel(buyGearPanel, GEAR_DATABASE, autoBuyGearTargets, "Buy Gear", "gear")
 
     local claimTitle = Instance.new("TextLabel")
     claimTitle.Size = UDim2.new(1, 0, 0, 24)
