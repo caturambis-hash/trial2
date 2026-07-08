@@ -1,5 +1,5 @@
 -- ============================================================
--- Grow A Garden 2 - Auto Gift Mail (Fix + Sync Inventory)
+-- Grow A Garden 2 - Auto Gift Mail (Fix Inventory Empty)
 -- ============================================================
 
 local Players = game:GetService("Players")
@@ -40,7 +40,7 @@ end
 loadModules()
 
 -- ============================================================
--- 2. DATABASE ITEM (Dari iyah.lua)
+-- 2. DATABASE ITEM (Pasti ada)
 -- ============================================================
 local SEED_DATABASE = {
     "Tulip", "Tomato", "Apple", "Bamboo", "Corn", "Cactus", "Pineapple", "Mushroom",
@@ -90,7 +90,6 @@ local function getLocalInventory()
     return data.Inventory
 end
 
--- Fungsi utama: menggabungkan database + inventory
 local function getFullItemList()
     local inventory = getLocalInventory()
     local items = {}
@@ -129,7 +128,7 @@ local function getFullItemList()
         end
     end
     
-    -- Tambahkan item dari inventory yang tidak ada di database (misal pets khusus)
+    -- Tambahkan item dari inventory yang tidak ada di database
     if inventory then
         for cat, data in pairs(inventory) do
             if cat == "Pets" then
@@ -161,7 +160,7 @@ local function getFullItemList()
 end
 
 -- ============================================================
--- 4. FUNGSI GIFT (Sama seperti iyah.lua)
+-- 4. FUNGSI GIFT
 -- ============================================================
 local function normalizeUsername(value)
     local username = tostring(value or "")
@@ -640,6 +639,7 @@ local function buildGiftPanel(panel)
     -- FUNGSI UPDATE ITEM LIST
     -- ============================================================
     local function updateItemList()
+        -- Hapus semua child
         for _, child in ipairs(itemFrame:GetChildren()) do
             if child:IsA("TextButton") then child:Destroy() end
         end
@@ -647,6 +647,9 @@ local function buildGiftPanel(panel)
         local query = searchQuery
         local cat = currentCategory
         local count = 0
+
+        -- DEBUG: print jumlah item
+        print("Updating item list, total items:", #allItems, "category:", cat)
 
         for _, item in ipairs(allItems) do
             if item.Category == cat then
@@ -683,14 +686,14 @@ local function buildGiftPanel(panel)
         end
     end
 
-    -- Initial load
+    -- Initial load (panggil sekali langsung)
     refreshInventory()
 
     -- REAL-TIME SYNC (setiap 0.01 detik)
     task.spawn(function()
         while true do
             if not panel or not panel.Parent then break end
-            -- Refresh tanpa update UI jika tidak ada perubahan? Lebih baik update terus
+            -- Refresh hanya jika ada perubahan (opsional, tapi biarkan saja)
             refreshInventory()
             task.wait(0.01)
         end
@@ -820,4 +823,4 @@ local function init()
 end
 
 spawn(init)
-print("📨 Auto Gift Mail - Fixed + Sync Inventory loaded!")
+print("📨 Auto Gift Mail - Final version loaded!")
