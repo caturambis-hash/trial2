@@ -1,6 +1,5 @@
 -- ============================================================
--- Grow A Garden 2 - Auto Gift Mail (Fix)
--- Menggunakan mekanisme dari: iyah.lua
+-- Grow A Garden 2 - Auto Gift Mail (Fix + Sync Inventory)
 -- ============================================================
 
 local Players = game:GetService("Players")
@@ -15,14 +14,13 @@ local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
 local PlayerName = LocalPlayer.Name
 
 -- ============================================================
--- 1. LOAD NETWORKING MODULES (seperti di iyah.lua)
+-- 1. LOAD NETWORKING MODULES
 -- ============================================================
 local SharedModules = ReplicatedStorage:FindFirstChild("SharedModules")
 local ClientModules = ReplicatedStorage:FindFirstChild("ClientModules")
 
 local Networking = nil
 local PlayerStateClient = nil
-local MailboxItemCatalog = nil
 
 local function safeRequire(module)
     if not module then return nil end
@@ -31,7 +29,7 @@ local function safeRequire(module)
     return nil
 end
 
-local function loadNetworkingModules()
+local function loadModules()
     if SharedModules then
         Networking = safeRequire(SharedModules:FindFirstChild("Networking"))
     end
@@ -39,10 +37,10 @@ local function loadNetworkingModules()
         PlayerStateClient = safeRequire(ClientModules:FindFirstChild("PlayerStateClient"))
     end
 end
-loadNetworkingModules()
+loadModules()
 
 -- ============================================================
--- 2. DATABASE ITEM (dari iyah.lua)
+-- 2. DATABASE ITEM (Dari iyah.lua)
 -- ============================================================
 local SEED_DATABASE = {
     "Tulip", "Tomato", "Apple", "Bamboo", "Corn", "Cactus", "Pineapple", "Mushroom",
@@ -77,7 +75,7 @@ local ITEM_DB = {
 }
 
 -- ============================================================
--- 3. FUNGSI INVENTORY (dari PlayerStateClient)
+-- 3. FUNGSI INVENTORY + FULL ITEM LIST
 -- ============================================================
 local function getLocalInventory()
     if not PlayerStateClient or type(PlayerStateClient.GetLocalReplica) ~= "function" then
@@ -92,36 +90,74 @@ local function getLocalInventory()
     return data.Inventory
 end
 
-local function collectInventoryEntries()
+-- Fungsi utama: menggabungkan database + inventory
+local function getFullItemList()
     local inventory = getLocalInventory()
-    if not inventory then return {} end
-    local entries = {}
-    for cat, data in pairs(inventory) do
-        if cat == "Pets" then
-            for key, val in pairs(data) do
-                if val and val.Id and not val.Equipped then
-                    table.insert(entries, {
-                        DisplayName = val.Name or key,
-                        ItemKey = key,
-                        Category = "Pets",
-                        Quantity = 1
-                    })
+    local items = {}
+    
+    -- Buat map quantity dari inventory
+    local invMap = {}
+    if inventory then
+        for cat, data in pairs(inventory) do
+            if cat == "Pets" then
+                for key, val in pairs(data) do
+                    if val and val.Id then
+                        invMap[cat .. ":" .. key] = 1
+                    end
                 end
-            end
-        elseif cat == "Seeds" or cat == "Gear" then
-            for key, qty in pairs(data) do
-                if qty > 0 then
-                    table.insert(entries, {
-                        DisplayName = key,
-                        ItemKey = key,
-                        Category = cat,
-                        Quantity = qty
-                    })
+            elseif cat == "Seeds" or cat == "Gear" then
+                for key, qty in pairs(data) do
+                    if qty > 0 then
+                        invMap[cat .. ":" .. key] = qty
+                    end
                 end
             end
         end
     end
-    return entries
+    
+    -- Iterasi database untuk semua kategori
+    for catName, list in pairs(ITEM_DB) do
+        for _, itemName in ipairs(list) do
+            local qty = invMap[catName .. ":" .. itemName] or 0
+            table.insert(items, {
+                DisplayName = itemName,
+                ItemKey = itemName,
+                Category = catName,
+                Quantity = qty,
+                selected = false,
+            })
+        end
+    end
+    
+    -- Tambahkan item dari inventory yang tidak ada di database (misal pets khusus)
+    if inventory then
+        for cat, data in pairs(inventory) do
+            if cat == "Pets" then
+                for key, val in pairs(data) do
+                    if val and val.Id then
+                        local found = false
+                        for _, it in ipairs(items) do
+                            if it.Category == "Pets" and it.ItemKey == key then
+                                found = true
+                                break
+                            end
+                        end
+                        if not found then
+                            table.insert(items, {
+                                DisplayName = val.Name or key,
+                                ItemKey = key,
+                                Category = "Pets",
+                                Quantity = 1,
+                                selected = false,
+                            })
+                        end
+                    end
+                end
+            end
+        end
+    end
+    
+    return items
 end
 
 -- ============================================================
@@ -371,53 +407,16 @@ end
 -- 7. BUILD GIFT PANEL
 -- ============================================================
 local function buildGiftPanel(panel)
-    -- State
     local allItems = {}
     local currentCategory = "Seeds"
     local searchQuery = ""
     local autoGiftEnabled = false
-    local isRefreshing = false
 
-    -- Fungsi refresh inventory dari PlayerStateClient
+    -- Fungsi refresh inventory
     local function refreshInventory()
-        if isRefreshing then return end
-        isRefreshing = true
-
-        local entries = collectInventoryEntries()
-        allItems = {}
-
-        if #entries > 0 then
-            -- Dari PlayerStateClient
-            for _, entry in ipairs(entries) do
-                local cat = entry.Category
-                if cat == "Seeds" or cat == "Gear" or cat == "Pets" then
-                    table.insert(allItems, {
-                        DisplayName = entry.DisplayName,
-                        ItemKey = entry.ItemKey,
-                        Category = cat,
-                        Quantity = entry.Quantity,
-                        selected = false,
-                    })
-                end
-            end
-        else
-            -- Fallback ke database jika inventory tidak terbaca
-            for cat, list in pairs(ITEM_DB) do
-                for _, name in ipairs(list) do
-                    table.insert(allItems, {
-                        DisplayName = name,
-                        ItemKey = name,
-                        Category = cat,
-                        Quantity = 1,
-                        selected = false,
-                    })
-                end
-            end
-        end
-
+        allItems = getFullItemList()
         updateItemList()
-        isRefreshing = false
-        return #entries
+        return #allItems
     end
 
     -- ============================================================
@@ -461,11 +460,7 @@ local function buildGiftPanel(panel)
 
     local syncBtn = createButton(row2, "🔄 Sync", Color3.fromRGB(50,50,70), function()
         local count = refreshInventory()
-        if count > 0 then
-            notify("🔄 Synced", count .. " items from inventory", 1.5)
-        else
-            notify("⚠️ Fallback", "Using database items", 1.5)
-        end
+        notify("🔄 Synced", count .. " items loaded", 1.5)
     end)
     syncBtn.Size = UDim2.new(0.23,0,0,24)
 
@@ -695,6 +690,7 @@ local function buildGiftPanel(panel)
     task.spawn(function()
         while true do
             if not panel or not panel.Parent then break end
+            -- Refresh tanpa update UI jika tidak ada perubahan? Lebih baik update terus
             refreshInventory()
             task.wait(0.01)
         end
@@ -720,7 +716,6 @@ local function buildUI()
     screen.IgnoreGuiInset = true
     screen.Parent = PlayerGui
 
-    -- Main frame (landscape)
     local mainFrame = Instance.new("Frame")
     mainFrame.Size = UDim2.new(0, 560, 0, 420)
     mainFrame.Position = UDim2.new(0.5, -280, 0.15, 0)
@@ -825,5 +820,4 @@ local function init()
 end
 
 spawn(init)
-print("📨 Auto Gift Mail - Fixed version loaded!")
-print("✅ Using Networking.Mailbox.SendBatch:Fire() for gift")
+print("📨 Auto Gift Mail - Fixed + Sync Inventory loaded!")
