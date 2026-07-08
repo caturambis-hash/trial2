@@ -446,6 +446,8 @@ local autoBuyGearsEnabled = false
 local autoClaimSeedDropEnabled = false
 local autoSkipTutorialEnabled = false
 local autoLoopRunning = false
+local autoBuySeedTargets = {}
+local autoBuyGearTargets = {}
 
 local function safeGetAttribute(instance, key)
     if not instance or not instance.GetAttribute then
@@ -632,13 +634,20 @@ local function autoBuySeedOrGear()
     local candidates = {}
     if autoBuySeedsEnabled then
         for _, item in ipairs(SEED_DATABASE) do
-            table.insert(candidates, item)
+            if autoBuySeedTargets[item] ~= false then
+                table.insert(candidates, item)
+            end
         end
     end
     if autoBuyGearsEnabled then
         for _, item in ipairs(GEAR_DATABASE) do
-            table.insert(candidates, item)
+            if autoBuyGearTargets[item] ~= false then
+                table.insert(candidates, item)
+            end
         end
+    end
+    if #candidates == 0 then
+        return false
     end
     for _, itemName in ipairs(candidates) do
         local lowerName = itemName:lower()
@@ -724,19 +733,29 @@ local function createMailGui()
     if PlayerGui:FindFirstChild("MailGui") then
         return
     end
+
+    for _, item in ipairs(SEED_DATABASE) do
+        autoBuySeedTargets[item] = true
+    end
+    for _, item in ipairs(GEAR_DATABASE) do
+        autoBuyGearTargets[item] = true
+    end
+
     local screen = Instance.new("ScreenGui")
     screen.Name = "MailGui"
     screen.ResetOnSpawn = false
     screen.Parent = PlayerGui
+
     local frame = Instance.new("Frame")
     frame.Name = "MainFrame"
-    frame.Size = UDim2.new(0, 460, 0, 340)
-    frame.Position = UDim2.new(0.5, -230, 0.08, 0)
-    frame.BackgroundColor3 = Color3.fromRGB(28, 28, 28)
+    frame.Size = UDim2.new(0, 640, 0, 400)
+    frame.Position = UDim2.new(0.5, -320, 0.08, 0)
+    frame.BackgroundColor3 = Color3.fromRGB(24, 24, 28)
     frame.BorderSizePixel = 0
     frame.Active = true
     frame.Draggable = true
     frame.Parent = screen
+
     local title = Instance.new("TextLabel")
     title.Name = "Title"
     title.Size = UDim2.new(1, 0, 0, 34)
@@ -747,12 +766,110 @@ local function createMailGui()
     title.TextSize = 18
     title.TextColor3 = Color3.fromRGB(235, 235, 235)
     title.Parent = frame
+
+    local sidebar = Instance.new("Frame")
+    sidebar.Name = "Sidebar"
+    sidebar.Size = UDim2.new(0, 140, 1, -40)
+    sidebar.Position = UDim2.new(0, 10, 0, 40)
+    sidebar.BackgroundColor3 = Color3.fromRGB(34, 34, 38)
+    sidebar.BorderSizePixel = 0
+    sidebar.Parent = frame
+    Instance.new("UICorner", sidebar).CornerRadius = UDim.new(0, 8)
+
+    local sidebarLayout = Instance.new("UIListLayout")
+    sidebarLayout.Parent = sidebar
+    sidebarLayout.Padding = UDim.new(0, 6)
+    sidebarLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+    sidebarLayout.VerticalAlignment = Enum.VerticalAlignment.Top
+
+    local contentFrame = Instance.new("Frame")
+    contentFrame.Name = "ContentFrame"
+    contentFrame.Size = UDim2.new(1, -170, 1, -50)
+    contentFrame.Position = UDim2.new(0, 160, 0, 42)
+    contentFrame.BackgroundTransparency = 1
+    contentFrame.Parent = frame
+
+    local function createTabButton(label, tabName)
+        local btn = Instance.new("TextButton")
+        btn.Name = tabName
+        btn.Size = UDim2.new(1, -12, 0, 34)
+        btn.BackgroundColor3 = Color3.fromRGB(50, 50, 56)
+        btn.TextColor3 = Color3.fromRGB(240, 240, 240)
+        btn.Text = label
+        btn.Font = Enum.Font.GothamSemibold
+        btn.TextSize = 12
+        btn.AutoButtonColor = true
+        btn.Parent = sidebar
+        Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 6)
+        btn.Activated:Connect(function()
+            setActiveTab(tabName)
+        end)
+        return btn
+    end
+
+    local giftPanel = Instance.new("Frame")
+    giftPanel.Name = "GiftMailPanel"
+    giftPanel.Size = UDim2.new(1, 0, 1, 0)
+    giftPanel.BackgroundTransparency = 1
+    giftPanel.Parent = contentFrame
+    giftPanel.Visible = true
+
+    local buySeedPanel = Instance.new("Frame")
+    buySeedPanel.Name = "BuySeedsPanel"
+    buySeedPanel.Size = UDim2.new(1, 0, 1, 0)
+    buySeedPanel.BackgroundTransparency = 1
+    buySeedPanel.Parent = contentFrame
+    buySeedPanel.Visible = false
+
+    local buyGearPanel = Instance.new("Frame")
+    buyGearPanel.Name = "BuyGearPanel"
+    buyGearPanel.Size = UDim2.new(1, 0, 1, 0)
+    buyGearPanel.BackgroundTransparency = 1
+    buyGearPanel.Parent = contentFrame
+    buyGearPanel.Visible = false
+
+    local claimPanel = Instance.new("Frame")
+    claimPanel.Name = "ClaimDropPanel"
+    claimPanel.Size = UDim2.new(1, 0, 1, 0)
+    claimPanel.BackgroundTransparency = 1
+    claimPanel.Parent = contentFrame
+    claimPanel.Visible = false
+
+    local tutorialPanel = Instance.new("Frame")
+    tutorialPanel.Name = "TutorialPanel"
+    tutorialPanel.Size = UDim2.new(1, 0, 1, 0)
+    tutorialPanel.BackgroundTransparency = 1
+    tutorialPanel.Parent = contentFrame
+    tutorialPanel.Visible = false
+
+    local tabButtons = {}
+    tabButtons.GiftMail = createTabButton("Gift Mail", "GiftMail")
+    tabButtons.BuySeed = createTabButton("Buy Seed", "BuySeed")
+    tabButtons.BuyGear = createTabButton("Buy Gear", "BuyGear")
+    tabButtons.ClaimDrop = createTabButton("Claim Drop Seed", "ClaimDrop")
+    tabButtons.SkipTutorial = createTabButton("Skip Tutorial", "SkipTutorial")
+
+    local function setActiveTab(tabName)
+        for _, btn in pairs(tabButtons) do
+            btn.BackgroundColor3 = Color3.fromRGB(50, 50, 56)
+        end
+        if tabButtons[tabName] then
+            tabButtons[tabName].BackgroundColor3 = Color3.fromRGB(88, 136, 186)
+        end
+        giftPanel.Visible = tabName == "GiftMail"
+        buySeedPanel.Visible = tabName == "BuySeed"
+        buyGearPanel.Visible = tabName == "BuyGear"
+        claimPanel.Visible = tabName == "ClaimDrop"
+        tutorialPanel.Visible = tabName == "SkipTutorial"
+    end
+    setActiveTab("GiftMail")
+
     local categoryFrame = Instance.new("Frame")
     categoryFrame.Name = "CategoryFrame"
-    categoryFrame.Size = UDim2.new(1, -16, 0, 34)
-    categoryFrame.Position = UDim2.new(0, 8, 0, 44)
+    categoryFrame.Size = UDim2.new(1, 0, 0, 34)
+    categoryFrame.Position = UDim2.new(0, 0, 0, 0)
     categoryFrame.BackgroundTransparency = 1
-    categoryFrame.Parent = frame
+    categoryFrame.Parent = giftPanel
     local categoryNames = {"Seeds", "Gear", "Pets"}
     local selectedCategory = "Seeds"
     local categoryButtons = {}
@@ -779,7 +896,7 @@ local function createMailGui()
         btn.Activated:Connect(function()
             selectedCategory = name
             updateCategoryButtons()
-            for _, child in ipairs(frame.ItemList:GetChildren()) do
+            for _, child in ipairs(itemList:GetChildren()) do
                 if child:IsA("TextButton") then
                     local category = child:GetAttribute("Category") or "Other"
                     child.Visible = category == selectedCategory
@@ -789,50 +906,122 @@ local function createMailGui()
         table.insert(categoryButtons, btn)
     end
     updateCategoryButtons()
+
     local itemList = Instance.new("ScrollingFrame")
     itemList.Name = "ItemList"
-    itemList.Size = UDim2.new(1, -120, 0, 170)
-    itemList.Position = UDim2.new(0, 8, 0, 84)
+    itemList.Size = UDim2.new(1, 0, 1, -190)
+    itemList.Position = UDim2.new(0, 0, 0, 44)
     itemList.BackgroundColor3 = Color3.fromRGB(38, 38, 38)
     itemList.BorderSizePixel = 0
     itemList.ScrollBarThickness = 6
     itemList.CanvasSize = UDim2.new(0, 0, 0, 0)
-    itemList.Parent = frame
+    itemList.Parent = giftPanel
     local listLayout = Instance.new("UIListLayout")
     listLayout.Parent = itemList
     listLayout.SortOrder = Enum.SortOrder.LayoutOrder
     listLayout.Padding = UDim.new(0, 6)
+
+    local mailControlsFrame = Instance.new("Frame")
+    mailControlsFrame.Name = "MailControls"
+    mailControlsFrame.Size = UDim2.new(1, 0, 0, 140)
+    mailControlsFrame.Position = UDim2.new(0, 0, 1, -140)
+    mailControlsFrame.BackgroundTransparency = 1
+    mailControlsFrame.Parent = giftPanel
+
     local usernameBox = Instance.new("TextBox")
     usernameBox.Name = "UsernameBox"
     usernameBox.PlaceholderText = "Recipient Username"
-    usernameBox.Size = UDim2.new(0.6, 0, 0, 32)
-    usernameBox.Position = UDim2.new(0, 8, 0, 220)
+    usernameBox.Size = UDim2.new(0.58, 0, 0, 32)
+    usernameBox.Position = UDim2.new(0, 0, 0, 0)
     usernameBox.BackgroundColor3 = Color3.fromRGB(52, 52, 58)
     usernameBox.TextColor3 = Color3.fromRGB(240, 240, 240)
     usernameBox.Text = settings.AutoMail.username
     usernameBox.ClearTextOnFocus = false
-    usernameBox.Parent = frame
+    usernameBox.Parent = mailControlsFrame
+
     local quantityBox = Instance.new("TextBox")
     quantityBox.Name = "QuantityBox"
     quantityBox.PlaceholderText = "Qty to send"
     quantityBox.Size = UDim2.new(0.28, 0, 0, 32)
-    quantityBox.Position = UDim2.new(0.62, 0, 0, 220)
+    quantityBox.Position = UDim2.new(0.60, 0, 0, 0)
     quantityBox.BackgroundColor3 = Color3.fromRGB(52, 52, 58)
     quantityBox.TextColor3 = Color3.fromRGB(240, 240, 240)
     quantityBox.Text = tostring(settings.AutoMail.itemcount)
     quantityBox.ClearTextOnFocus = false
-    quantityBox.Parent = frame
+    quantityBox.Parent = mailControlsFrame
+
     local statusLabel = Instance.new("TextLabel")
     statusLabel.Name = "StatusLabel"
-    statusLabel.Size = UDim2.new(1, -16, 0, 22)
-    statusLabel.Position = UDim2.new(0, 8, 0, 260)
+    statusLabel.Size = UDim2.new(1, 0, 0, 22)
+    statusLabel.Position = UDim2.new(0, 0, 0, 42)
     statusLabel.BackgroundTransparency = 1
     statusLabel.Text = "Ready"
     statusLabel.TextColor3 = Color3.fromRGB(215, 215, 215)
     statusLabel.Font = Enum.Font.Gotham
     statusLabel.TextSize = 12
     statusLabel.TextXAlignment = Enum.TextXAlignment.Left
-    statusLabel.Parent = frame
+    statusLabel.Parent = mailControlsFrame
+
+    local selectAllButton = Instance.new("TextButton")
+    selectAllButton.Name = "SelectAll"
+    selectAllButton.Size = UDim2.new(0.22, 0, 0, 28)
+    selectAllButton.Position = UDim2.new(0, 0, 0, 72)
+    selectAllButton.Text = "Select All"
+    selectAllButton.BackgroundColor3 = Color3.fromRGB(70, 70, 80)
+    selectAllButton.TextColor3 = Color3.fromRGB(245, 245, 245)
+    selectAllButton.Font = Enum.Font.Gotham
+    selectAllButton.TextSize = 12
+    selectAllButton.Parent = mailControlsFrame
+    Instance.new("UICorner", selectAllButton).CornerRadius = UDim.new(0, 6)
+
+    local clearButton = Instance.new("TextButton")
+    clearButton.Name = "ClearSelection"
+    clearButton.Size = UDim2.new(0.22, 0, 0, 28)
+    clearButton.Position = UDim2.new(0.24, 0, 0, 72)
+    clearButton.Text = "Clear"
+    clearButton.BackgroundColor3 = Color3.fromRGB(70, 70, 80)
+    clearButton.TextColor3 = Color3.fromRGB(245, 245, 245)
+    clearButton.Font = Enum.Font.Gotham
+    clearButton.TextSize = 12
+    clearButton.Parent = mailControlsFrame
+    Instance.new("UICorner", clearButton).CornerRadius = UDim.new(0, 6)
+
+    local syncButton = Instance.new("TextButton")
+    syncButton.Name = "SyncButton"
+    syncButton.Size = UDim2.new(0.22, 0, 0, 28)
+    syncButton.Position = UDim2.new(0.48, 0, 0, 72)
+    syncButton.Text = "Sync Inventory"
+    syncButton.BackgroundColor3 = Color3.fromRGB(70, 70, 90)
+    syncButton.TextColor3 = Color3.fromRGB(240, 240, 240)
+    syncButton.Font = Enum.Font.Gotham
+    syncButton.TextSize = 12
+    syncButton.Parent = mailControlsFrame
+    Instance.new("UICorner", syncButton).CornerRadius = UDim.new(0, 6)
+
+    local sendButton = Instance.new("TextButton")
+    sendButton.Name = "SendButton"
+    sendButton.Size = UDim2.new(0.22, 0, 0, 28)
+    sendButton.Position = UDim2.new(0.72, 0, 0, 72)
+    sendButton.Text = "Send Mail"
+    sendButton.BackgroundColor3 = Color3.fromRGB(75, 125, 180)
+    sendButton.TextColor3 = Color3.fromRGB(245, 245, 245)
+    sendButton.Font = Enum.Font.Gotham
+    sendButton.TextSize = 12
+    sendButton.Parent = mailControlsFrame
+    Instance.new("UICorner", sendButton).CornerRadius = UDim.new(0, 6)
+
+    local autoButton = Instance.new("TextButton")
+    autoButton.Name = "AutoGiftButton"
+    autoButton.Size = UDim2.new(0.22, 0, 0, 28)
+    autoButton.Position = UDim2.new(0.96, -8, 0, 72)
+    autoButton.Text = "Auto Gift OFF"
+    autoButton.BackgroundColor3 = Color3.fromRGB(175, 80, 80)
+    autoButton.TextColor3 = Color3.fromRGB(245, 245, 245)
+    autoButton.Font = Enum.Font.Gotham
+    autoButton.TextSize = 12
+    autoButton.Parent = mailControlsFrame
+    Instance.new("UICorner", autoButton).CornerRadius = UDim.new(0, 6)
+
     local function setStatus(text)
         statusLabel.Text = tostring(text)
         print("[GrowAGarden2 Mail] " .. tostring(text))
@@ -840,65 +1029,6 @@ local function createMailGui()
     local function updateCanvas()
         itemList.CanvasSize = UDim2.new(0, 0, 0, listLayout.AbsoluteContentSize.Y + 10)
     end
-
-    local sidebarFrame = Instance.new("Frame")
-    sidebarFrame.Name = "SidebarFrame"
-    sidebarFrame.Size = UDim2.new(0, 96, 0, 170)
-    sidebarFrame.Position = UDim2.new(1, -104, 0, 84)
-    sidebarFrame.BackgroundColor3 = Color3.fromRGB(34, 34, 38)
-    sidebarFrame.BorderSizePixel = 0
-    sidebarFrame.Parent = frame
-    Instance.new("UICorner", sidebarFrame).CornerRadius = UDim.new(0, 8)
-
-    local sidebarLayout = Instance.new("UIListLayout")
-    sidebarLayout.Parent = sidebarFrame
-    sidebarLayout.Padding = UDim.new(0, 6)
-    sidebarLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
-    sidebarLayout.VerticalAlignment = Enum.VerticalAlignment.Top
-
-    local function updateAutoToggleButtons()
-        buySeedToggle.BackgroundColor3 = autoBuySeedsEnabled and Color3.fromRGB(90, 150, 90) or Color3.fromRGB(70, 70, 80)
-        buySeedToggle.Text = "Buy Seeds" .. (autoBuySeedsEnabled and " ON" or " OFF")
-        buyGearToggle.BackgroundColor3 = autoBuyGearsEnabled and Color3.fromRGB(90, 150, 90) or Color3.fromRGB(70, 70, 80)
-        buyGearToggle.Text = "Buy Gear" .. (autoBuyGearsEnabled and " ON" or " OFF")
-        claimSeedToggle.BackgroundColor3 = autoClaimSeedDropEnabled and Color3.fromRGB(90, 150, 90) or Color3.fromRGB(70, 70, 80)
-        claimSeedToggle.Text = "Claim Drops" .. (autoClaimSeedDropEnabled and " ON" or " OFF")
-        skipTutorialToggle.BackgroundColor3 = autoSkipTutorialEnabled and Color3.fromRGB(90, 150, 90) or Color3.fromRGB(70, 70, 80)
-        skipTutorialToggle.Text = "Skip Tutorial" .. (autoSkipTutorialEnabled and " ON" or " OFF")
-    end
-
-    local function createSidebarToggle(label, key)
-        local button = Instance.new("TextButton")
-        button.Size = UDim2.new(1, -8, 0, 28)
-        button.BackgroundColor3 = Color3.fromRGB(70, 70, 80)
-        button.TextColor3 = Color3.fromRGB(245, 245, 245)
-        button.Font = Enum.Font.Gotham
-        button.TextSize = 10
-        button.AutoButtonColor = true
-        button.Text = label
-        button.Parent = sidebarFrame
-        Instance.new("UICorner", button).CornerRadius = UDim.new(0, 6)
-        button.Activated:Connect(function()
-            if key == "buySeeds" then
-                autoBuySeedsEnabled = not autoBuySeedsEnabled
-            elseif key == "buyGear" then
-                autoBuyGearsEnabled = not autoBuyGearsEnabled
-            elseif key == "claimDrops" then
-                autoClaimSeedDropEnabled = not autoClaimSeedDropEnabled
-            elseif key == "skipTutorial" then
-                autoSkipTutorialEnabled = not autoSkipTutorialEnabled
-            end
-            updateAutoToggleButtons()
-            startAutomationLoop()
-        end)
-        return button
-    end
-
-    local buySeedToggle = createSidebarToggle("Buy Seeds", "buySeeds")
-    local buyGearToggle = createSidebarToggle("Buy Gear", "buyGear")
-    local claimSeedToggle = createSidebarToggle("Claim Drops", "claimDrops")
-    local skipTutorialToggle = createSidebarToggle("Skip Tutorial", "skipTutorial")
-    updateAutoToggleButtons()
 
     local function formatLabel(itemName, qty, category)
         local label = itemName
@@ -908,6 +1038,7 @@ local function createMailGui()
         label = label .. " [" .. tostring(category) .. "]"
         return label
     end
+
     local function addItemButton(itemName, qty, itemKey, inventoryCategory)
         local category = categorizeItem(itemName)
         local btn = Instance.new("TextButton")
@@ -932,6 +1063,7 @@ local function createMailGui()
             btn.BackgroundColor3 = selected and Color3.fromRGB(90, 150, 90) or Color3.fromRGB(60, 60, 60)
         end)
     end
+
     local function refreshInventory()
         for _, child in ipairs(itemList:GetChildren()) do
             if child:IsA("TextButton") then
@@ -964,6 +1096,7 @@ local function createMailGui()
             setStatus("Inventory terdeteksi: " .. tostring(total) .. " item")
         end
     end
+
     local function selectVisibleItems(select)
         for _, child in ipairs(itemList:GetChildren()) do
             if child:IsA("TextButton") then
@@ -975,21 +1108,22 @@ local function createMailGui()
             end
         end
     end
-local function getSelectedItems()
-    local selected = {}
-    for _, child in ipairs(itemList:GetChildren()) do
-        if child:IsA("TextButton") and child:GetAttribute("Selected") then
-            table.insert(selected, {
-                name = child:GetAttribute("DisplayName"),
-                key = child:GetAttribute("ItemKey"),
-                category = child:GetAttribute("Category"),
-                inventoryCategory = child:GetAttribute("InventoryCategory"),
-                qty = tonumber(child:GetAttribute("Quantity")) or 1
-            })
+
+    local function getSelectedItems()
+        local selected = {}
+        for _, child in ipairs(itemList:GetChildren()) do
+            if child:IsA("TextButton") and child:GetAttribute("Selected") then
+                table.insert(selected, {
+                    name = child:GetAttribute("DisplayName"),
+                    key = child:GetAttribute("ItemKey"),
+                    category = child:GetAttribute("Category"),
+                    inventoryCategory = child:GetAttribute("InventoryCategory"),
+                    qty = tonumber(child:GetAttribute("Quantity")) or 1
+                })
+            end
         end
+        return selected
     end
-    return selected
-end
 
     local function sendByMail(recipient, maxQty)
         setStatus("Preparing mail batch...")
@@ -1030,61 +1164,7 @@ end
         setStatus("Terkirim " .. tostring(sentCount) .. " item ke " .. tostring(username))
         return true
     end
-    local syncButton = Instance.new("TextButton")
-    syncButton.Name = "SyncButton"
-    syncButton.Size = UDim2.new(0.3, 0, 0, 28)
-    syncButton.Position = UDim2.new(0.7, -8, 0, 300)
-    syncButton.Text = "Sync Inventory"
-    syncButton.BackgroundColor3 = Color3.fromRGB(70, 70, 90)
-    syncButton.TextColor3 = Color3.fromRGB(240, 240, 240)
-    syncButton.Font = Enum.Font.Gotham
-    syncButton.TextSize = 12
-    syncButton.Parent = frame
-    Instance.new("UICorner", syncButton).CornerRadius = UDim.new(0, 6)
-    local sendButton = Instance.new("TextButton")
-    sendButton.Name = "SendButton"
-    sendButton.Size = UDim2.new(0.3, 0, 0, 32)
-    sendButton.Position = UDim2.new(0.34, 0, 0, 266)
-    sendButton.Text = "Send Mail"
-    sendButton.BackgroundColor3 = Color3.fromRGB(75, 125, 180)
-    sendButton.TextColor3 = Color3.fromRGB(245, 245, 245)
-    sendButton.Font = Enum.Font.Gotham
-    sendButton.TextSize = 12
-    sendButton.Parent = frame
-    Instance.new("UICorner", sendButton).CornerRadius = UDim.new(0, 6)
-    local autoButton = Instance.new("TextButton")
-    autoButton.Name = "AutoGiftButton"
-    autoButton.Size = UDim2.new(0.3, 0, 0, 32)
-    autoButton.Position = UDim2.new(0.68, 0, 0, 266)
-    autoButton.Text = "Auto Gift OFF"
-    autoButton.BackgroundColor3 = Color3.fromRGB(175, 80, 80)
-    autoButton.TextColor3 = Color3.fromRGB(245, 245, 245)
-    autoButton.Font = Enum.Font.Gotham
-    autoButton.TextSize = 12
-    autoButton.Parent = frame
-    Instance.new("UICorner", autoButton).CornerRadius = UDim.new(0, 6)
-    local selectAllButton = Instance.new("TextButton")
-    selectAllButton.Name = "SelectAll"
-    selectAllButton.Size = UDim2.new(0.22, 0, 0, 28)
-    selectAllButton.Position = UDim2.new(0, 8, 0, 228)
-    selectAllButton.Text = "Select All"
-    selectAllButton.BackgroundColor3 = Color3.fromRGB(70, 70, 80)
-    selectAllButton.TextColor3 = Color3.fromRGB(245, 245, 245)
-    selectAllButton.Font = Enum.Font.Gotham
-    selectAllButton.TextSize = 12
-    selectAllButton.Parent = frame
-    Instance.new("UICorner", selectAllButton).CornerRadius = UDim.new(0, 6)
-    local clearButton = Instance.new("TextButton")
-    clearButton.Name = "ClearSelection"
-    clearButton.Size = UDim2.new(0.22, 0, 0, 28)
-    clearButton.Position = UDim2.new(0.24, 0, 0, 228)
-    clearButton.Text = "Clear"
-    clearButton.BackgroundColor3 = Color3.fromRGB(70, 70, 80)
-    clearButton.TextColor3 = Color3.fromRGB(245, 245, 245)
-    clearButton.Font = Enum.Font.Gotham
-    clearButton.TextSize = 12
-    clearButton.Parent = frame
-    Instance.new("UICorner", clearButton).CornerRadius = UDim.new(0, 6)
+
     local autoEnabled = false
     local autoRunning = false
     local function updateAutoButton()
@@ -1134,6 +1214,7 @@ end
             autoRunning = false
         end)
     end
+
     syncButton.Activated:Connect(refreshInventory)
     sendButton.Activated:Connect(function()
         local recipient = usernameBox.Text
@@ -1157,6 +1238,136 @@ end
             autoGiftLoop()
         end
     end)
+
+    local function createDatabaseToggleList(panel, entries, stateTable, labelPrefix, enableFlag)
+        local title = Instance.new("TextLabel")
+        title.Size = UDim2.new(1, 0, 0, 24)
+        title.Position = UDim2.new(0, 0, 0, 0)
+        title.BackgroundTransparency = 1
+        title.Text = labelPrefix .. " Database"
+        title.TextColor3 = Color3.fromRGB(235, 235, 235)
+        title.Font = Enum.Font.GothamBold
+        title.TextSize = 13
+        title.Parent = panel
+
+        local toggleButton = Instance.new("TextButton")
+        toggleButton.Size = UDim2.new(1, 0, 0, 30)
+        toggleButton.Position = UDim2.new(0, 0, 0, 28)
+        toggleButton.BackgroundColor3 = Color3.fromRGB(70, 70, 80)
+        toggleButton.TextColor3 = Color3.fromRGB(245, 245, 245)
+        toggleButton.Font = Enum.Font.Gotham
+        toggleButton.TextSize = 12
+        toggleButton.Text = labelPrefix .. " Auto ON"
+        toggleButton.Parent = panel
+        Instance.new("UICorner", toggleButton).CornerRadius = UDim.new(0, 6)
+
+        local listFrame = Instance.new("ScrollingFrame")
+        listFrame.Size = UDim2.new(1, 0, 1, -72)
+        listFrame.Position = UDim2.new(0, 0, 0, 66)
+        listFrame.BackgroundColor3 = Color3.fromRGB(38, 38, 38)
+        listFrame.BorderSizePixel = 0
+        listFrame.ScrollBarThickness = 6
+        listFrame.Parent = panel
+        local listLayout = Instance.new("UIListLayout")
+        listLayout.Parent = listFrame
+        listLayout.Padding = UDim.new(0, 6)
+
+        local function updateToggleState()
+            toggleButton.BackgroundColor3 = enableFlag and Color3.fromRGB(90, 150, 90) or Color3.fromRGB(70, 70, 80)
+            toggleButton.Text = labelPrefix .. (enableFlag and " Auto ON" or " Auto OFF")
+        end
+
+        toggleButton.Activated:Connect(function()
+            if labelPrefix == "Buy Seed" then
+                autoBuySeedsEnabled = not autoBuySeedsEnabled
+            else
+                autoBuyGearsEnabled = not autoBuyGearsEnabled
+            end
+            enableFlag = not enableFlag
+            updateToggleState()
+            startAutomationLoop()
+        end)
+
+        for _, entry in ipairs(entries) do
+            local btn = Instance.new("TextButton")
+            btn.Size = UDim2.new(1, 0, 0, 28)
+            btn.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+            btn.TextColor3 = Color3.fromRGB(235, 235, 235)
+            btn.Font = Enum.Font.Gotham
+            btn.TextSize = 11
+            btn.Text = entry
+            btn.Parent = listFrame
+            Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 6)
+            btn.Activated:Connect(function()
+                stateTable[entry] = not stateTable[entry]
+                btn.BackgroundColor3 = stateTable[entry] and Color3.fromRGB(90, 150, 90) or Color3.fromRGB(60, 60, 60)
+            end)
+            stateTable[entry] = stateTable[entry] ~= false
+            btn.BackgroundColor3 = stateTable[entry] and Color3.fromRGB(90, 150, 90) or Color3.fromRGB(60, 60, 60)
+        end
+
+        updateToggleState()
+    end
+
+    local buySeedEnable = autoBuySeedsEnabled
+    local buyGearEnable = autoBuyGearsEnabled
+    createDatabaseToggleList(buySeedPanel, SEED_DATABASE, autoBuySeedTargets, "Buy Seed", buySeedEnable)
+    createDatabaseToggleList(buyGearPanel, GEAR_DATABASE, autoBuyGearTargets, "Buy Gear", buyGearEnable)
+
+    local claimTitle = Instance.new("TextLabel")
+    claimTitle.Size = UDim2.new(1, 0, 0, 24)
+    claimTitle.Position = UDim2.new(0, 0, 0, 0)
+    claimTitle.BackgroundTransparency = 1
+    claimTitle.Text = "Auto Claim Seed Drop"
+    claimTitle.TextColor3 = Color3.fromRGB(235, 235, 235)
+    claimTitle.Font = Enum.Font.GothamBold
+    claimTitle.TextSize = 13
+    claimTitle.Parent = claimPanel
+
+    local claimToggle = Instance.new("TextButton")
+    claimToggle.Size = UDim2.new(1, 0, 0, 34)
+    claimToggle.Position = UDim2.new(0, 0, 0, 36)
+    claimToggle.BackgroundColor3 = Color3.fromRGB(70, 70, 80)
+    claimToggle.TextColor3 = Color3.fromRGB(245, 245, 245)
+    claimToggle.Font = Enum.Font.Gotham
+    claimToggle.TextSize = 12
+    claimToggle.Text = "Claim Drop OFF"
+    claimToggle.Parent = claimPanel
+    Instance.new("UICorner", claimToggle).CornerRadius = UDim.new(0, 6)
+    claimToggle.Activated:Connect(function()
+        autoClaimSeedDropEnabled = not autoClaimSeedDropEnabled
+        claimToggle.BackgroundColor3 = autoClaimSeedDropEnabled and Color3.fromRGB(90, 150, 90) or Color3.fromRGB(70, 70, 80)
+        claimToggle.Text = autoClaimSeedDropEnabled and "Claim Drop ON" or "Claim Drop OFF"
+        startAutomationLoop()
+    end)
+
+    local tutorialTitle = Instance.new("TextLabel")
+    tutorialTitle.Size = UDim2.new(1, 0, 0, 24)
+    tutorialTitle.Position = UDim2.new(0, 0, 0, 0)
+    tutorialTitle.BackgroundTransparency = 1
+    tutorialTitle.Text = "Auto Skip Tutorial"
+    tutorialTitle.TextColor3 = Color3.fromRGB(235, 235, 235)
+    tutorialTitle.Font = Enum.Font.GothamBold
+    tutorialTitle.TextSize = 13
+    tutorialTitle.Parent = tutorialPanel
+
+    local tutorialToggle = Instance.new("TextButton")
+    tutorialToggle.Size = UDim2.new(1, 0, 0, 34)
+    tutorialToggle.Position = UDim2.new(0, 0, 0, 36)
+    tutorialToggle.BackgroundColor3 = Color3.fromRGB(70, 70, 80)
+    tutorialToggle.TextColor3 = Color3.fromRGB(245, 245, 245)
+    tutorialToggle.Font = Enum.Font.Gotham
+    tutorialToggle.TextSize = 12
+    tutorialToggle.Text = "Skip Tutorial OFF"
+    tutorialToggle.Parent = tutorialPanel
+    Instance.new("UICorner", tutorialToggle).CornerRadius = UDim.new(0, 6)
+    tutorialToggle.Activated:Connect(function()
+        autoSkipTutorialEnabled = not autoSkipTutorialEnabled
+        tutorialToggle.BackgroundColor3 = autoSkipTutorialEnabled and Color3.fromRGB(90, 150, 90) or Color3.fromRGB(70, 70, 80)
+        tutorialToggle.Text = autoSkipTutorialEnabled and "Skip Tutorial ON" or "Skip Tutorial OFF"
+        startAutomationLoop()
+    end)
+
     refreshInventory()
     updateCanvas()
     syncInventoryFunction = refreshInventory
