@@ -1,643 +1,150 @@
 -- ============================================================
--- Grow A Garden 2 - Ultimate Hub (Full Function)
+-- AUTO GIFT MAIL - Panel Lengkap
 -- ============================================================
 
-local Players = game:GetService("Players")
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local RunService = game:GetService("RunService")
-local TweenService = game:GetService("TweenService")
-local UserInputService = game:GetService("UserInputService")
-local TeleportService = game:GetService("TeleportService")
-local VirtualUser = game:GetService("VirtualUser")
+-- Asumsi: ITEM_DB sudah didefinisikan dari getItemDatabase()
 
-local LocalPlayer = Players.LocalPlayer
-if not LocalPlayer then return end
-local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
-local PlayerName = LocalPlayer.Name
-
--- ============================================================
--- 1. AMBIL DATABASE ITEM DARI GAME
--- ============================================================
-local function getItemDatabase()
-    local db = { Seeds = {}, Gear = {}, Pets = {}, Props = {} }
-    -- Coba ambil dari StockValues
-    local stock = ReplicatedStorage:FindFirstChild("StockValues")
-    if stock then
-        local seedShop = stock:FindFirstChild("SeedShop")
-        if seedShop then
-            local items = seedShop:FindFirstChild("Items")
-            if items then
-                for _, child in ipairs(items:GetChildren()) do
-                    if child:IsA("IntValue") or child:IsA("NumberValue") then
-                        table.insert(db.Seeds, child.Name)
-                    end
-                end
-            end
-        end
-        local gearShop = stock:FindFirstChild("GearShop")
-        if gearShop then
-            local items = gearShop:FindFirstChild("Items")
-            if items then
-                for _, child in ipairs(items:GetChildren()) do
-                    if child:IsA("IntValue") or child:IsA("NumberValue") then
-                        table.insert(db.Gear, child.Name)
-                    end
-                end
-            end
-        end
-    end
-    -- Fallback jika tidak ditemukan
-    if #db.Seeds == 0 then
-        db.Seeds = {"Acorn","Apple","Bamboo","Banana","Blueberry","Briar Rose","Cactus",
-            "Carrot","Cherry","Coconut","Corn","Dragon Fruit","Dragon's Breath",
-            "Grape","Green Bean","Hypno Bloom","Mango","Moon Bloom","Mushroom",
-            "Pineapple","Poison Apple","Pomegranate","Pumpkin","Strawberry",
-            "Sunflower","Tomato","Tulip","Venom Spitter","Venus Fly Trap","Watermelon"}
-    end
-    if #db.Gear == 0 then
-        db.Gear = {"Common Watering Can","Common Sprinkler","Uncommon Sprinkler","Rare Sprinkler",
-            "Legendary Sprinkler","Super Watering Can","Super Sprinkler",
-            "Jump Mushroom","Speed Mushroom","Shrink Mushroom","Supersize Mushroom",
-            "Invisibility Mushroom","Trowel","Sign","Lantern","Megaphone",
-            "Gnome","Flashbang","Basic Pot","Teleporter","Wheelbarrow",
-            "Strawberry Sniper","Player Magnet"}
-    end
-    if #db.Pets == 0 then
-        db.Pets = {"Bee","Bear","Bunny","Cat","Cow","Deer","Dog","Dragon","Eagle",
-            "Fox","Frog","Giraffe","Horse","Lion","Monkey","Owl","Panda",
-            "Penguin","Pig","Rabbit","Raccoon","Sheep","Snake","Squirrel",
-            "Tiger","Turtle","Unicorn","Wolf","Zebra"}
-    end
-    if #db.Props == 0 then
-        db.Props = {"Sign","Lantern","Gnome","Basic Pot","Teleporter","Wheelbarrow"}
-    end
-    return db
-end
-
-local ITEM_DB = getItemDatabase()
-
--- ============================================================
--- 2. FUNGSI UTILITY
--- ============================================================
-local function normalizeText(t) return tostring(t or ""):lower():gsub("%s+"," "):gsub("^%s*(.-)%s*$","%1") end
-
--- ============================================================
--- 3. REMOTE EVENT & NETWORKING (Dari kode mail exploiter)
--- ============================================================
-local RemoteEvent = nil
-local function getRemote()
-    if not RemoteEvent then
-        local possible = {
-            ReplicatedStorage:FindFirstChild("RemoteEvent"),
-            ReplicatedStorage:FindFirstChild("SharedModules") and ReplicatedStorage.SharedModules:FindFirstChild("Packet") and ReplicatedStorage.SharedModules.Packet:FindFirstChild("RemoteEvent"),
-            ReplicatedStorage:FindFirstChild("Packet") and ReplicatedStorage.Packet:FindFirstChild("RemoteEvent"),
-        }
-        for _, p in ipairs(possible) do
-            if p then RemoteEvent = p; break end
-        end
-    end
-    return RemoteEvent
-end
-
-local function fireServer(action, data)
-    local remote = getRemote()
-    if remote then pcall(function() remote:FireServer(action, data) end) end
-end
-
--- ============================================================
--- 4. AUTO BUY (menggunakan buffer)
--- ============================================================
-local function buyShopItem(shopKey, itemName)
-    local remote = getRemote()
-    if not remote then return false end
-    local prefix = shopKey == "Seed" and "j" or (shopKey == "Gear" and "n" or "")
-    if prefix == "" then return false end
-    if type(buffer) ~= "table" or type(buffer.fromstring) ~= "function" then return false end
-    local payload = buffer.fromstring(prefix .. "\x00" .. string.char(#itemName) .. itemName)
-    local ok, _ = pcall(function() remote:FireServer(payload) end)
-    return ok
-end
-
-local function getStock(shopKey, itemName)
-    local folder = ReplicatedStorage:FindFirstChild("StockValues")
-    if not folder then return 0 end
-    local shop = folder:FindFirstChild(shopKey == "Seed" and "SeedShop" or "GearShop")
-    if not shop then return 0 end
-    local items = shop:FindFirstChild("Items")
-    if not items then return 0 end
-    local val = items:FindFirstChild(itemName)
-    if val and (val:IsA("IntValue") or val:IsA("NumberValue")) then return val.Value end
-    return 0
-end
-
--- ============================================================
--- 5. AUTO GIFT MAIL
--- ============================================================
-local function lookupRecipient(username)
-    local remote = getRemote()
-    if remote then
-        local ok, res = pcall(function() return remote:InvokeServer("LookupPlayer", username) end)
-        if ok and type(res) == "number" and res > 0 then return res end
-    end
-    local ok, id = pcall(Players.GetUserIdFromNameAsync, Players, username)
-    if ok and type(id) == "number" and id > 0 then return id end
-    return nil
-end
-
-local function sendMailBatch(userId, payload, note)
-    local remote = getRemote()
-    if not remote then return false, "Remote not found" end
-    local ok, res, msg = pcall(function()
-        return remote:InvokeServer("SendBatch", userId, payload, tostring(note or ""))
-    end)
-    if not ok then return false, tostring(res) end
-    if res == true then return true, tostring(msg or "Sent") end
-    return false, tostring(msg or "Failed")
-end
-
--- ============================================================
--- 6. FUNGSI GET INVENTORY (dari mail exploiter)
--- ============================================================
-local function getInventory()
-    local inv = {}
-    -- Coba ambil dari PlayerStateClient jika ada
+-- Fungsi getInventory dari mail exploiter (ambil dari Replica)
+local function getInventoryReplica()
     local shared = ReplicatedStorage:FindFirstChild("SharedModules")
-    if shared then
-        local client = shared:FindFirstChild("ClientModules")
-        if client then
-            local psc = client:FindFirstChild("PlayerStateClient")
-            if psc then
-                local ok, replica = pcall(require, psc)
-                if ok and replica and replica.GetLocalReplica then
-                    local ok2, data = pcall(replica.GetLocalReplica, replica)
-                    if ok2 and data and data.Data and data.Data.Inventory then
-                        for cat, items in pairs(data.Data.Inventory) do
-                            for name, qty in pairs(items) do
-                                table.insert(inv, { name = name, category = cat, qty = qty })
-                            end
-                        end
-                        return inv
-                    end
+    if not shared then return nil end
+    local client = shared:FindFirstChild("ClientModules")
+    if not client then return nil end
+    local psc = client:FindFirstChild("PlayerStateClient")
+    if not psc then return nil end
+    local ok, module = pcall(require, psc)
+    if not ok or not module then return nil end
+    local ok2, replica = pcall(module.GetLocalReplica, module)
+    if not ok2 or not replica then return nil end
+    return replica.Data and replica.Data.Inventory
+end
+
+-- Fungsi collect inventory entries (seperti di mail exploiter)
+local function collectInventoryEntries()
+    local inventory = getInventoryReplica()
+    if not inventory then return {} end
+    local entries = {}
+    for cat, data in pairs(inventory) do
+        if cat == "Pets" then
+            for key, val in pairs(data) do
+                if val and val.Id and not val.Equipped then
+                    table.insert(entries, { DisplayName = val.Name or key, ItemKey = key, Category = "Pets", Quantity = 1 })
+                end
+            end
+        elseif cat == "Seeds" or cat == "Gear" or cat == "Crops" then
+            for key, qty in pairs(data) do
+                if qty > 0 then
+                    table.insert(entries, { DisplayName = key, ItemKey = key, Category = cat, Quantity = qty })
                 end
             end
         end
     end
-    -- Fallback: scan PlayerGui dan Backpack
-    local function scan(obj)
-        if not obj then return end
-        for _, child in ipairs(obj:GetDescendants()) do
-            if child:IsA("TextLabel") or child:IsA("TextButton") or child:IsA("TextBox") then
-                local txt = child.Text or ""
-                if txt ~= "" then
-                    local name = txt:match("^([^%d]+)") or txt
-                    local qty = tonumber(txt:match("(%d+)$")) or 1
-                    table.insert(inv, { name = normalizeText(name), category = "Unknown", qty = qty })
-                end
-            end
-        end
+    return entries
+end
+
+-- Fungsi build payload dari selection
+local function buildPayload(selectedItems)
+    local payload = {}
+    for _, item in ipairs(selectedItems) do
+        table.insert(payload, { Category = item.Category, ItemKey = item.ItemKey, Count = 1 })
     end
-    scan(LocalPlayer:FindFirstChild("Backpack"))
-    scan(LocalPlayer:FindFirstChild("Inventory"))
-    scan(PlayerGui)
-    return inv
+    return payload
 end
 
 -- ============================================================
--- 7. AUTO SELL (placeholder - sesuaikan dengan remote sell)
+-- BUILD GIFT PANEL
 -- ============================================================
-local function sellAllFruits()
-    -- Di game, mungkin ada remote untuk sell all
-    fireServer("SellAll", {})
-    return true
-end
-
--- ============================================================
--- 8. AUTO PLANT & COLLECT (menggunakan fireclickdetector / firetouchinterest)
--- ============================================================
-local function findPlots()
-    local plots = {}
-    for _, obj in ipairs(workspace:GetDescendants()) do
-        if obj:IsA("BasePart") and (obj.Name:lower():find("plot") or obj.Name:lower():find("farm")) then
-            local det = obj:FindFirstChildWhichIsA("ClickDetector")
-            if det then
-                table.insert(plots, { part = obj, detector = det })
-            end
-        end
-    end
-    return plots
-end
-
-local function plantSeed(seedName, position)
-    -- Cari plot terdekat dengan posisi
-    local plots = findPlots()
-    local target = nil
-    local minDist = math.huge
-    for _, p in ipairs(plots) do
-        local dist = (p.part.Position - position).Magnitude
-        if dist < minDist then
-            minDist = dist
-            target = p
-        end
-    end
-    if target and minDist < 20 then
-        -- Pindahkan player ke dekat plot
-        local char = LocalPlayer.Character
-        if char and char.PrimaryPart then
-            char.PrimaryPart.CFrame = target.part.CFrame + Vector3.new(0,0,2)
-            task.wait(0.3)
-            if fireclickdetector then
-                fireclickdetector(target.detector)
-                return true
-            end
-        end
-    end
-    return false
-end
-
-local function collectFruit(fruitName)
-    local char = LocalPlayer.Character
-    if not char or not char.PrimaryPart then return false end
-    local collected = false
-    for _, obj in ipairs(workspace:GetDescendants()) do
-        if obj:IsA("BasePart") and obj.Name:lower():find(fruitName:lower()) then
-            local dist = (obj.Position - char.PrimaryPart.Position).Magnitude
-            if dist < 8 then
-                if firetouchinterest then
-                    firetouchinterest(char.PrimaryPart, obj, 0)
-                    firetouchinterest(char.PrimaryPart, obj, 1)
-                    collected = true
-                end
-            end
-        end
-    end
-    return collected
-end
-
--- ============================================================
--- 9. ROLLBACK (simpan state item yang ditanam)
--- ============================================================
-local rollbackData = {}
-local function savePlantedItem(itemName, position)
-    table.insert(rollbackData, { name = itemName, pos = position, time = os.time() })
-end
-
-local function restoreRollback()
-    -- Saat rejoin, kembalikan item ke inventory (simulasi)
-    for _, data in ipairs(rollbackData) do
-        -- Kirim remote untuk menambahkan item ke inventory
-        fireServer("AddItem", { name = data.name, qty = 1 })
-    end
-    rollbackData = {}
-end
-
--- ============================================================
--- 10. NOTIFIKASI
--- ============================================================
-local function notify(text, sub, dur)
-    dur = dur or 2.5
-    local gui = Instance.new("ScreenGui")
-    gui.Name = "Notify"
-    gui.IgnoreGuiInset = true
-    gui.Parent = PlayerGui
-
-    local f = Instance.new("Frame")
-    f.BackgroundColor3 = Color3.fromRGB(25,22,30)
-    f.BorderSizePixel = 0
-    f.Position = UDim2.new(1,400,0,20)
-    f.Size = UDim2.new(0,340,0,60)
-    f.Parent = gui
-
-    local t = Instance.new("TextLabel")
-    t.BackgroundTransparency = 1
-    t.Font = Enum.Font.GothamBold
-    t.Text = text
-    t.TextColor3 = Color3.fromRGB(230,200,240)
-    t.TextSize = 15
-    t.TextXAlignment = Enum.TextXAlignment.Left
-    t.Position = UDim2.new(0,10,0,6)
-    t.Size = UDim2.new(1,-20,0,22)
-    t.Parent = f
-
-    local s = Instance.new("TextLabel")
-    s.BackgroundTransparency = 1
-    s.Font = Enum.Font.Gotham
-    s.Text = sub or ""
-    s.TextColor3 = Color3.fromRGB(180,160,170)
-    s.TextSize = 12
-    s.TextXAlignment = Enum.TextXAlignment.Left
-    s.Position = UDim2.new(0,10,0,28)
-    s.Size = UDim2.new(1,-20,0,22)
-    s.Parent = f
-
-    TweenService:Create(f, TweenInfo.new(0.15, Enum.EasingStyle.Quad), {
-        Position = UDim2.new(1,-380,0,20)
-    }):Play()
-
-    delay(dur, function()
-        if f and f.Parent then
-            TweenService:Create(f, TweenInfo.new(0.15), {
-                Position = UDim2.new(1,400,0,20)
-            }):Play()
-            delay(0.25, function() if gui and gui.Parent then gui:Destroy() end end)
-        end
-    end)
-end
-
--- ============================================================
--- 11. UI HELPERS
--- ============================================================
-local function createToggle(parent, label, default, callback)
-    local frame = Instance.new("Frame")
-    frame.BackgroundColor3 = Color3.fromRGB(35,30,38)
-    frame.BorderSizePixel = 0
-    frame.Size = UDim2.new(1,0,0,36)
-    frame.Parent = parent
-
-    local btn = Instance.new("ImageButton")
-    btn.BackgroundColor3 = Color3.fromRGB(40,35,45)
-    btn.BackgroundTransparency = 0
-    btn.BorderSizePixel = 0
-    btn.Position = UDim2.new(0,0,0,0)
-    btn.Size = UDim2.new(1,0,1,0)
-    btn.AutoButtonColor = false
-    btn.Parent = frame
-
-    local lbl = Instance.new("TextLabel")
-    lbl.BackgroundTransparency = 1
-    lbl.Font = Enum.Font.Gotham
-    lbl.Text = label
-    lbl.TextColor3 = Color3.fromRGB(220,200,210)
-    lbl.TextSize = 12
-    lbl.TextXAlignment = Enum.TextXAlignment.Left
-    lbl.Position = UDim2.new(0,10,0,0)
-    lbl.Size = UDim2.new(0.65,-10,1,0)
-    lbl.Parent = frame
-
-    local toggleFrame = Instance.new("Frame")
-    toggleFrame.BackgroundColor3 = Color3.fromRGB(50,45,55)
-    toggleFrame.BorderSizePixel = 0
-    toggleFrame.Position = UDim2.new(1,-50-10,0.5,-10)
-    toggleFrame.Size = UDim2.new(0,36,0,20)
-    toggleFrame.Parent = frame
-
-    local inner = Instance.new("Frame")
-    inner.BackgroundColor3 = Color3.fromRGB(80,70,90)
-    inner.BorderSizePixel = 0
-    inner.Position = UDim2.new(0,2,0,2)
-    inner.Size = UDim2.new(0,16,0,16)
-    inner.Parent = toggleFrame
-
-    local status = Instance.new("TextLabel")
-    status.BackgroundTransparency = 1
-    status.Font = Enum.Font.Gotham
-    status.Text = "OFF"
-    status.TextColor3 = Color3.fromRGB(160,140,150)
-    status.TextSize = 10
-    status.TextXAlignment = Enum.TextXAlignment.Right
-    status.Position = UDim2.new(1,-58-10,0.5,-10)
-    status.Size = UDim2.new(0,35,0,20)
-    status.Parent = frame
-
-    local state = default or false
-    local function update(s)
-        state = s
-        TweenService:Create(inner, TweenInfo.new(0.12), {
-            Position = s and UDim2.new(1,-18,0,2) or UDim2.new(0,2,0,2),
-            BackgroundColor3 = s and Color3.fromRGB(100,200,100) or Color3.fromRGB(80,70,90)
-        }):Play()
-        TweenService:Create(toggleFrame, TweenInfo.new(0.12), {
-            BackgroundColor3 = s and Color3.fromRGB(60,150,60) or Color3.fromRGB(50,45,55)
-        }):Play()
-        status.Text = s and "ON" or "OFF"
-        status.TextColor3 = s and Color3.fromRGB(120,220,120) or Color3.fromRGB(160,140,150)
-        if callback then callback(s) end
-    end
-    btn.MouseButton1Click:Connect(function() update(not state) end)
-    update(state)
-    return { update = update, getState = function() return state end }
-end
-
-local function createButton(parent, text, color, callback)
-    local btn = Instance.new("TextButton")
-    btn.BackgroundColor3 = color or Color3.fromRGB(50,40,60)
-    btn.BorderSizePixel = 0
-    btn.Font = Enum.Font.GothamBold
-    btn.Text = text
-    btn.TextColor3 = Color3.fromRGB(240,220,245)
-    btn.TextSize = 13
-    btn.AutoButtonColor = false
-    btn.Size = UDim2.new(1,0,0,32)
-    btn.Parent = parent
-    btn.MouseEnter:Connect(function()
-        TweenService:Create(btn, TweenInfo.new(0.08), {
-            BackgroundColor3 = btn.BackgroundColor3:Lerp(Color3.new(0.15,0.05,0.2),0.1)
-        }):Play()
-    end)
-    btn.MouseLeave:Connect(function()
-        TweenService:Create(btn, TweenInfo.new(0.08), {
-            BackgroundColor3 = btn.BackgroundColor3:Lerp(Color3.new(0.2,0.15,0.25),0.1)
-        }):Play()
-    end)
-    if callback then btn.MouseButton1Click:Connect(callback) end
-    return btn
-end
-
-local function createInput(parent, placeholder, default, width)
-    local box = Instance.new("TextBox")
-    box.Size = UDim2.new(width or 0.5,0,0,26)
-    box.BackgroundColor3 = Color3.fromRGB(52,52,58)
-    box.TextColor3 = Color3.fromRGB(240,240,240)
-    box.Text = default or ""
-    box.PlaceholderText = placeholder or ""
-    box.ClearTextOnFocus = false
-    box.Font = Enum.Font.Gotham
-    box.TextSize = 12
-    box.Parent = parent
-    return box
-end
-
-local function createDropdown(parent, label, options, default)
-    local frame = Instance.new("Frame")
-    frame.BackgroundTransparency = 1
-    frame.Size = UDim2.new(1,0,0,30)
-    frame.Parent = parent
-
-    local lbl = Instance.new("TextLabel")
-    lbl.BackgroundTransparency = 1
-    lbl.Font = Enum.Font.Gotham
-    lbl.Text = label .. ": "
-    lbl.TextColor3 = Color3.fromRGB(200,200,200)
-    lbl.TextSize = 12
-    lbl.TextXAlignment = Enum.TextXAlignment.Left
-    lbl.Position = UDim2.new(0,0,0,0)
-    lbl.Size = UDim2.new(0.3,0,1,0)
-    lbl.Parent = frame
-
-    local btn = Instance.new("TextButton")
-    btn.BackgroundColor3 = Color3.fromRGB(50,50,60)
-    btn.BorderSizePixel = 0
-    btn.TextColor3 = Color3.fromRGB(240,240,240)
-    btn.Text = default or options[1] or ""
-    btn.Font = Enum.Font.Gotham
-    btn.TextSize = 12
-    btn.Position = UDim2.new(0.35,0,0,0)
-    btn.Size = UDim2.new(0.6,0,1,0)
-    btn.Parent = frame
-    Instance.new("UICorner", btn).CornerRadius = UDim.new(0,4)
-
-    local selected = default or options[1] or ""
-    btn.MouseButton1Click:Connect(function()
-        local current = btn.Text
-        local idx = 1
-        for i, opt in ipairs(options) do
-            if opt == current then idx = i break end
-        end
-        local nextIdx = idx % #options + 1
-        selected = options[nextIdx]
-        btn.Text = selected
-        if callback then callback(selected) end
-    end)
-    return { getValue = function() return selected end }
-end
-
--- ============================================================
--- 12. STATE
--- ============================================================
-local state = {
-    giftUsername = "Ceszganteng",
-    giftQty = 20,
-    giftAuto = false,
-    giftItems = {}, -- { name, category, selected }
-
-    buySeeds = {},
-    buyGear = {},
-    buyProps = {},
-    buyAuto = false,
-
-    sellAuto = false,
-    sellInterval = 30,
-    sellAll = false,
-
-    plantAuto = false,
-    plantItem = "",
-    plantLocation = "Center",
-    plantSavedPos = nil,
-
-    collectAuto = false,
-    collectFruit = "",
-    collectAll = false,
-
-    rollbackAuto = false,
-}
-
--- ============================================================
--- 13. PANEL BUILDERS
--- ============================================================
-
--- Panel Gift
 local function buildGiftPanel(panel)
+    -- State untuk panel ini
+    local giftState = {
+        selectedItems = {}, -- { ItemKey, Category, DisplayName }
+        allItems = {},
+        filteredItems = {},
+        searchQuery = "",
+        currentCategory = "Seeds",
+        autoGiftEnabled = false,
+    }
+
+    -- ============================================================
+    -- UI ELEMENTS
+    -- ============================================================
+
+    -- Input username & qty (baris pertama)
     local userBox = createInput(panel, "Username", state.giftUsername, 0.5)
     local qtyBox = createInput(panel, "Qty", tostring(state.giftQty), 0.4)
     qtyBox.Position = UDim2.new(0.55,0,0,0)
 
+    -- Tombol Sync, Select All, Clear, Send (baris kedua)
     local btnRow = Instance.new("Frame")
     btnRow.BackgroundTransparency = 1
     btnRow.Size = UDim2.new(1,0,0,30)
     btnRow.Parent = panel
 
     local syncBtn = createButton(btnRow, "🔄 Sync", Color3.fromRGB(50,50,70), function()
-        notify("🔄 Syncing", "Fetching inventory...", 1.5)
-        -- Refresh item list
-        local inv = getInventory()
-        -- Update state.giftItems
+        refreshInventory()
+        notify("🔄 Synced", "Inventory updated", 1)
     end)
     syncBtn.Size = UDim2.new(0.23,0,0,24)
 
     local selectBtn = createButton(btnRow, "☑ All", Color3.fromRGB(60,60,70), function()
-        for _, item in ipairs(state.giftItems) do item.selected = true end
-        for _, child in ipairs(itemFrame:GetChildren()) do
-            if child:IsA("TextButton") then
-                child:SetAttribute("selected", true)
-                child.BackgroundColor3 = Color3.fromRGB(90,150,90)
-            end
-        end
-        notify("☑ All selected", "", 1)
+        selectAllItems(true)
     end)
     selectBtn.Size = UDim2.new(0.23,0,0,24)
 
     local clearBtn = createButton(btnRow, "☐ Clear", Color3.fromRGB(60,60,70), function()
-        for _, item in ipairs(state.giftItems) do item.selected = false end
-        for _, child in ipairs(itemFrame:GetChildren()) do
-            if child:IsA("TextButton") then
-                child:SetAttribute("selected", false)
-                child.BackgroundColor3 = Color3.fromRGB(60,60,60)
-            end
-        end
-        notify("☐ Cleared", "", 1)
+        selectAllItems(false)
     end)
     clearBtn.Size = UDim2.new(0.23,0,0,24)
 
     local sendBtn = createButton(btnRow, "📤 Send", Color3.fromRGB(75,125,180), function()
-        local recipient = userBox.Text
-        if recipient == "" then notify("⚠ Error", "Username kosong", 2) return end
-        local qty = tonumber(qtyBox.Text) or 1
-        local selected = {}
-        for _, item in ipairs(state.giftItems) do
-            if item.selected then
-                table.insert(selected, { name = item.name, category = item.category, qty = 1 })
-            end
-        end
-        if #selected == 0 then notify("⚠ Error", "Tidak ada item dipilih", 2) return end
-        local userId = lookupRecipient(recipient)
-        if not userId then notify("⚠ Error", "User tidak ditemukan", 2) return end
-        local payload = {}
-        for _, it in ipairs(selected) do
-            table.insert(payload, { Category = it.category, ItemKey = it.name, Count = 1 })
-        end
-        local ok, msg = sendMailBatch(userId, payload, "")
-        if ok then
-            notify("✅ Sent", #selected .. " items to " .. recipient, 2.5)
-        else
-            notify("❌ Failed", msg, 2.5)
-        end
+        sendMail()
     end)
     sendBtn.Size = UDim2.new(0.23,0,0,24)
 
-    -- Auto Gift toggle
-    local autoToggle = createToggle(panel, "🔁 Auto Gift", state.giftAuto, function(s)
-        state.giftAuto = s
-        if s then
-            notify("🔄 Auto Gift", "Started", 1.5)
-            task.spawn(function()
-                while state.giftAuto do
-                    local recipient = userBox.Text
-                    if recipient == "" then break end
-                    local qty = tonumber(qtyBox.Text) or 1
-                    local selected = {}
-                    for _, item in ipairs(state.giftItems) do
-                        if item.selected then
-                            table.insert(selected, { name = item.name, category = item.category, qty = 1 })
-                        end
-                    end
-                    if #selected > 0 then
-                        local userId = lookupRecipient(recipient)
-                        if userId then
-                            local payload = {}
-                            for _, it in ipairs(selected) do
-                                table.insert(payload, { Category = it.category, ItemKey = it.name, Count = 1 })
-                            end
-                            sendMailBatch(userId, payload, "")
-                        end
-                    end
-                    task.wait(3)
-                end
-            end)
-        else
-            notify("⏹ Auto Gift", "Stopped", 1.5)
-        end
+    -- Kategori tab (baris ketiga)
+    local catFrame = Instance.new("Frame")
+    catFrame.BackgroundTransparency = 1
+    catFrame.Size = UDim2.new(1,0,0,30)
+    catFrame.Parent = panel
+
+    local categories = {"Seeds", "Gear", "Crops", "Pets"}
+    local catBtns = {}
+    for i, cat in ipairs(categories) do
+        local btn = Instance.new("TextButton")
+        btn.Size = UDim2.new(0.23,0,0,24)
+        btn.Position = UDim2.new((i-1)*0.25,0,0,0)
+        btn.BackgroundColor3 = (i==1) and Color3.fromRGB(88,136,186) or Color3.fromRGB(50,50,56)
+        btn.TextColor3 = Color3.fromRGB(240,240,240)
+        btn.Text = cat
+        btn.Font = Enum.Font.GothamSemibold
+        btn.TextSize = 11
+        btn.Parent = catFrame
+        btn.MouseButton1Click:Connect(function()
+            giftState.currentCategory = cat
+            for _, b in ipairs(catBtns) do
+                b.BackgroundColor3 = (b == btn) and Color3.fromRGB(88,136,186) or Color3.fromRGB(50,50,56)
+            end
+            updateItemList()
+        end)
+        table.insert(catBtns, btn)
+    end
+
+    -- Search bar (baris keempat)
+    local searchBox = Instance.new("TextBox")
+    searchBox.Size = UDim2.new(1,0,0,26)
+    searchBox.BackgroundColor3 = Color3.fromRGB(52,52,58)
+    searchBox.TextColor3 = Color3.fromRGB(240,240,240)
+    searchBox.PlaceholderText = "🔍 Search items..."
+    searchBox.ClearTextOnFocus = false
+    searchBox.Font = Enum.Font.Gotham
+    searchBox.TextSize = 12
+    searchBox.Parent = panel
+    searchBox:GetPropertyChangedSignal("Text"):Connect(function()
+        giftState.searchQuery = normalizeText(searchBox.Text)
+        updateItemList()
     end)
 
-    -- Item list
+    -- Item list (ScrollingFrame)
     local itemFrame = Instance.new("ScrollingFrame")
     itemFrame.BackgroundColor3 = Color3.fromRGB(38,38,38)
     itemFrame.BorderSizePixel = 0
@@ -650,544 +157,145 @@ local function buildGiftPanel(panel)
     itemLayout.SortOrder = Enum.SortOrder.LayoutOrder
     itemLayout.Parent = itemFrame
 
-    -- Populate item list dari ITEM_DB
-    local function refreshItems()
+    -- Auto Gift toggle (baris bawah)
+    local autoToggle = createToggle(panel, "🔁 Auto Gift", state.giftAuto, function(s)
+        state.giftAuto = s
+        giftState.autoGiftEnabled = s
+        if s then
+            notify("🔄 Auto Gift", "Started", 1.5)
+            task.spawn(function()
+                while giftState.autoGiftEnabled do
+                    local recipient = userBox.Text
+                    if recipient == "" then break end
+                    local qty = tonumber(qtyBox.Text) or 1
+                    local selected = getSelectedItems()
+                    if #selected > 0 then
+                        local userId = lookupRecipient(recipient)
+                        if userId then
+                            local payload = buildPayload(selected)
+                            sendMailBatch(userId, payload, "")
+                        end
+                    end
+                    task.wait(3)
+                end
+            end)
+        else
+            notify("⏹ Auto Gift", "Stopped", 1.5)
+        end
+    end)
+
+    -- ============================================================
+    -- FUNGSI INTERNAL
+    -- ============================================================
+
+    local function getSelectedItems()
+        local selected = {}
+        for _, item in ipairs(giftState.allItems) do
+            if item.selected then
+                table.insert(selected, { Category = item.Category, ItemKey = item.ItemKey, DisplayName = item.DisplayName })
+            end
+        end
+        return selected
+    end
+
+    local function selectAllItems(select)
+        for _, item in ipairs(giftState.allItems) do
+            if item.Category == giftState.currentCategory then
+                item.selected = select
+            end
+        end
+        updateItemList()
+    end
+
+    local function sendMail()
+        local recipient = userBox.Text
+        if recipient == "" then notify("⚠ Error", "Username kosong", 2) return end
+        local selected = getSelectedItems()
+        if #selected == 0 then notify("⚠ Error", "Tidak ada item dipilih", 2) return end
+        local userId = lookupRecipient(recipient)
+        if not userId then notify("⚠ Error", "User tidak ditemukan", 2) return end
+        local payload = buildPayload(selected)
+        local ok, msg = sendMailBatch(userId, payload, "")
+        if ok then
+            notify("✅ Sent", #selected .. " items to " .. recipient, 2.5)
+        else
+            notify("❌ Failed", msg, 2.5)
+        end
+    end
+
+    local function refreshInventory()
+        local entries = collectInventoryEntries()
+        giftState.allItems = {}
+        for _, entry in ipairs(entries) do
+            -- Map category ke display category
+            local displayCat = entry.Category
+            if displayCat == "Seeds" or displayCat == "Gear" or displayCat == "Crops" or displayCat == "Pets" then
+                table.insert(giftState.allItems, {
+                    DisplayName = entry.DisplayName,
+                    ItemKey = entry.ItemKey,
+                    Category = displayCat,
+                    Quantity = entry.Quantity,
+                    selected = false,
+                })
+            end
+        end
+        updateItemList()
+        notify("🔄 Synced", #giftState.allItems .. " items found", 1)
+    end
+
+    local function updateItemList()
+        -- Hapus semua item dari itemFrame
         for _, child in ipairs(itemFrame:GetChildren()) do
             if child:IsA("TextButton") then child:Destroy() end
         end
-        state.giftItems = {}
-        local allItems = {}
-        for _, cat in ipairs({"Seeds","Gear","Pets","Props"}) do
-            for _, name in ipairs(ITEM_DB[cat] or {}) do
-                table.insert(allItems, {name=name, category=cat})
-            end
-        end
-        for _, item in ipairs(allItems) do
-            local btn = Instance.new("TextButton")
-            btn.Size = UDim2.new(1,0,0,22)
-            btn.BackgroundColor3 = Color3.fromRGB(60,60,60)
-            btn.TextColor3 = Color3.fromRGB(235,235,235)
-            btn.Font = Enum.Font.Gotham
-            btn.TextSize = 11
-            btn.Text = item.name .. " [" .. item.category .. "]"
-            btn.Parent = itemFrame
-            btn:SetAttribute("selected", false)
-            btn.MouseButton1Click:Connect(function()
-                local sel = not btn:GetAttribute("selected")
-                btn:SetAttribute("selected", sel)
-                btn.BackgroundColor3 = sel and Color3.fromRGB(90,150,90) or Color3.fromRGB(60,60,60)
-                for _, it in ipairs(state.giftItems) do
-                    if it.name == item.name and it.category == item.category then
-                        it.selected = sel
-                    end
+
+        local query = giftState.searchQuery
+        local cat = giftState.currentCategory
+        local count = 0
+        for _, item in ipairs(giftState.allItems) do
+            if item.Category == cat then
+                local nameLower = normalizeText(item.DisplayName)
+                if query == "" or nameLower:find(query, 1, true) then
+                    local btn = Instance.new("TextButton")
+                    btn.Size = UDim2.new(1,0,0,22)
+                    btn.BackgroundColor3 = item.selected and Color3.fromRGB(90,150,90) or Color3.fromRGB(60,60,60)
+                    btn.TextColor3 = Color3.fromRGB(235,235,235)
+                    btn.Font = Enum.Font.Gotham
+                    btn.TextSize = 11
+                    btn.Text = item.DisplayName .. " (" .. item.Quantity .. ")"
+                    btn.Parent = itemFrame
+                    btn.MouseButton1Click:Connect(function()
+                        item.selected = not item.selected
+                        btn.BackgroundColor3 = item.selected and Color3.fromRGB(90,150,90) or Color3.fromRGB(60,60,60)
+                    end)
+                    count = count + 1
                 end
-            end)
-            table.insert(state.giftItems, { name = item.name, category = item.category, selected = false })
+            end
         end
         itemFrame.CanvasSize = UDim2.new(0,0,0, itemLayout.AbsoluteContentSize.Y + 10)
-    end
-    refreshItems()
-end
-
--- Panel Buy
-local function buildBuyPanel(panel)
-    local autoToggle = createToggle(panel, "🛒 Auto Buy (All)", state.buyAuto, function(s)
-        state.buyAuto = s
-        if s then
-            notify("🛒 Auto Buy", "Started", 1.5)
-            task.spawn(function()
-                while state.buyAuto do
-                    for _, seed in ipairs(state.buySeeds) do
-                        if seed.selected then
-                            if getStock("Seed", seed.name) > 0 then
-                                buyShopItem("Seed", seed.name)
-                                task.wait(0.2)
-                            end
-                        end
-                    end
-                    for _, gear in ipairs(state.buyGear) do
-                        if gear.selected then
-                            if getStock("Gear", gear.name) > 0 then
-                                buyShopItem("Gear", gear.name)
-                                task.wait(0.2)
-                            end
-                        end
-                    end
-                    for _, prop in ipairs(state.buyProps) do
-                        if prop.selected then
-                            if getStock("Gear", prop.name) > 0 then
-                                buyShopItem("Gear", prop.name)
-                                task.wait(0.2)
-                            end
-                        end
-                    end
-                    task.wait(5)
-                end
-            end)
-        else
-            notify("⏹ Auto Buy", "Stopped", 1.5)
+        if count == 0 then
+            local empty = Instance.new("TextLabel")
+            empty.BackgroundTransparency = 1
+            empty.Font = Enum.Font.Gotham
+            empty.Text = "No items found"
+            empty.TextColor3 = Color3.fromRGB(180,180,180)
+            empty.TextSize = 12
+            empty.Size = UDim2.new(1,0,0,22)
+            empty.Parent = itemFrame
         end
-    end)
+    end
 
-    local function buildItemList(parent, items, stateArray, title)
-        local frame = Instance.new("Frame")
-        frame.BackgroundTransparency = 1
-        frame.Size = UDim2.new(1,0,0,120)
-        frame.Parent = parent
+    -- Initial sync
+    refreshInventory()
 
-        local lbl = Instance.new("TextLabel")
-        lbl.BackgroundTransparency = 1
-        lbl.Font = Enum.Font.GothamBold
-        lbl.Text = title
-        lbl.TextColor3 = Color3.fromRGB(200,200,200)
-        lbl.TextSize = 12
-        lbl.Position = UDim2.new(0,0,0,0)
-        lbl.Size = UDim2.new(1,0,0,20)
-        lbl.Parent = frame
-
-        local scroll = Instance.new("ScrollingFrame")
-        scroll.BackgroundColor3 = Color3.fromRGB(38,38,38)
-        scroll.BorderSizePixel = 0
-        scroll.Size = UDim2.new(1,0,1,-20)
-        scroll.Position = UDim2.new(0,0,0,20)
-        scroll.ScrollBarThickness = 4
-        scroll.Parent = frame
-
-        local layout = Instance.new("UIListLayout")
-        layout.Padding = UDim.new(0,2)
-        layout.SortOrder = Enum.SortOrder.LayoutOrder
-        layout.Parent = scroll
-
-        local btnFrame = Instance.new("Frame")
-        btnFrame.BackgroundTransparency = 1
-        btnFrame.Size = UDim2.new(1,0,0,24)
-        btnFrame.Parent = frame
-
-        local selAll = createButton(btnFrame, "Select All", Color3.fromRGB(60,60,70), function()
-            for _, item in ipairs(stateArray) do item.selected = true end
-            for _, child in ipairs(scroll:GetChildren()) do
-                if child:IsA("TextButton") then
-                    child:SetAttribute("selected", true)
-                    child.BackgroundColor3 = Color3.fromRGB(90,150,90)
-                end
+    -- Auto sync setiap 5 detik (opsional)
+    task.spawn(function()
+        while wait(5) do
+            if panel and panel.Parent then
+                refreshInventory()
+            else
+                break
             end
-        end)
-        selAll.Size = UDim2.new(0.4,0,0,20)
-
-        local clearAll = createButton(btnFrame, "Clear", Color3.fromRGB(60,60,70), function()
-            for _, item in ipairs(stateArray) do item.selected = false end
-            for _, child in ipairs(scroll:GetChildren()) do
-                if child:IsA("TextButton") then
-                    child:SetAttribute("selected", false)
-                    child.BackgroundColor3 = Color3.fromRGB(60,60,60)
-                end
-            end
-        end)
-        clearAll.Size = UDim2.new(0.4,0,0,20)
-        clearAll.Position = UDim2.new(0.5,0,0,0)
-
-        for _, itemName in ipairs(items) do
-            local btn = Instance.new("TextButton")
-            btn.Size = UDim2.new(1,0,0,20)
-            btn.BackgroundColor3 = Color3.fromRGB(60,60,60)
-            btn.TextColor3 = Color3.fromRGB(235,235,235)
-            btn.Font = Enum.Font.Gotham
-            btn.TextSize = 10
-            btn.Text = "☐ " .. itemName
-            btn.Parent = scroll
-            btn:SetAttribute("selected", false)
-            local entry = { name = itemName, selected = false }
-            table.insert(stateArray, entry)
-            btn.MouseButton1Click:Connect(function()
-                local sel = not btn:GetAttribute("selected")
-                btn:SetAttribute("selected", sel)
-                entry.selected = sel
-                btn.Text = (sel and "☑ " or "☐ ") .. itemName
-                btn.BackgroundColor3 = sel and Color3.fromRGB(90,150,90) or Color3.fromRGB(60,60,60)
-            end)
-        end
-        scroll.CanvasSize = UDim2.new(0,0,0, layout.AbsoluteContentSize.Y + 10)
-    end
-
-    buildItemList(panel, ITEM_DB.Seeds, state.buySeeds, "🌱 Seeds")
-    buildItemList(panel, ITEM_DB.Gear, state.buyGear, "🔧 Gear")
-    buildItemList(panel, ITEM_DB.Props, state.buyProps, "📦 Props")
-end
-
--- Panel Sell
-local function buildSellPanel(panel)
-    local autoToggle = createToggle(panel, "💰 Auto Sell", state.sellAuto, function(s)
-        state.sellAuto = s
-        if s then
-            notify("💰 Auto Sell", "Started", 1.5)
-            task.spawn(function()
-                while state.sellAuto do
-                    local interval = tonumber(intervalBox.Text) or 30
-                    if state.sellAll then
-                        sellAllFruits()
-                    end
-                    task.wait(interval)
-                end
-            end)
-        else
-            notify("⏹ Auto Sell", "Stopped", 1.5)
-        end
-    end)
-
-    local intervalBox = createInput(panel, "Interval (detik)", "30", 0.4)
-    local sellAllToggle = createToggle(panel, "Sell All Inventory", state.sellAll, function(s)
-        state.sellAll = s
-    end)
-end
-
--- Panel Plant
-local function buildPlantPanel(panel)
-    local itemDropdown = createDropdown(panel, "Item", ITEM_DB.Seeds, ITEM_DB.Seeds[1])
-    local locOptions = {"Center", "Edge", "Player Position", "Saved Position"}
-    local locDropdown = createDropdown(panel, "Location", locOptions, "Center")
-
-    local saveBtn = createButton(panel, "💾 Save Current Position", Color3.fromRGB(60,60,80), function()
-        local char = LocalPlayer.Character
-        if char and char.PrimaryPart then
-            state.plantSavedPos = char.PrimaryPart.Position
-            notify("💾 Saved", "Position saved", 1.5)
-        else
-            notify("⚠ Error", "Character not found", 1.5)
-        end
-    end)
-
-    local autoToggle = createToggle(panel, "🌱 Auto Plant", state.plantAuto, function(s)
-        state.plantAuto = s
-        if s then
-            notify("🌱 Auto Plant", "Started", 1.5)
-            task.spawn(function()
-                while state.plantAuto do
-                    local item = itemDropdown.getValue()
-                    local loc = locDropdown.getValue()
-                    local char = LocalPlayer.Character
-                    if char and char.PrimaryPart then
-                        local targetPos = nil
-                        if loc == "Center" then
-                            targetPos = Vector3.new(0,0,0) -- ganti dengan posisi tengah plot
-                        elseif loc == "Edge" then
-                            targetPos = Vector3.new(10,0,10) -- ganti dengan posisi pinggir
-                        elseif loc == "Player Position" then
-                            targetPos = char.PrimaryPart.Position
-                        elseif loc == "Saved Position" and state.plantSavedPos then
-                            targetPos = state.plantSavedPos
-                        end
-                        if targetPos then
-                            plantSeed(item, targetPos)
-                            -- Simpan untuk rollback
-                            if state.rollbackAuto then
-                                savePlantedItem(item, targetPos)
-                            end
-                        end
-                    end
-                    task.wait(5)
-                end
-            end)
-        else
-            notify("⏹ Auto Plant", "Stopped", 1.5)
         end
     end)
 end
-
--- Panel Collect
-local function buildCollectPanel(panel)
-    local fruitOptions = {"Apple", "Banana", "Orange", "Grape", "Watermelon"} -- sesuaikan
-    local fruitDropdown = createDropdown(panel, "Fruit", fruitOptions, fruitOptions[1])
-
-    local collectAllToggle = createToggle(panel, "Collect All", state.collectAll, function(s)
-        state.collectAll = s
-    end)
-
-    local autoToggle = createToggle(panel, "📦 Auto Collect", state.collectAuto, function(s)
-        state.collectAuto = s
-        if s then
-            notify("📦 Auto Collect", "Started", 1.5)
-            task.spawn(function()
-                while state.collectAuto do
-                    local fruit = fruitDropdown.getValue()
-                    if state.collectAll then
-                        -- Collect all fruits (loop through all types)
-                        for _, f in ipairs(fruitOptions) do
-                            collectFruit(f)
-                            task.wait(0.1)
-                        end
-                    else
-                        collectFruit(fruit)
-                    end
-                    task.wait(1)
-                end
-            end)
-        else
-            notify("⏹ Auto Collect", "Stopped", 1.5)
-        end
-    end)
-end
-
--- Panel Rollback
-local function buildRollbackPanel(panel)
-    local autoToggle = createToggle(panel, "🔄 Rollback Protection", state.rollbackAuto, function(s)
-        state.rollbackAuto = s
-        if s then
-            notify("🔄 Rollback", "Protection active", 1.5)
-            -- Hook ke rejoin
-            local conn = LocalPlayer.CharacterAdded:Connect(function()
-                if state.rollbackAuto then
-                    restoreRollback()
-                end
-            end)
-            -- Simpan connection untuk cleanup
-        else
-            notify("⏹ Rollback", "Protection off", 1.5)
-        end
-    end)
-
-    local info = Instance.new("TextLabel")
-    info.BackgroundTransparency = 1
-    info.Font = Enum.Font.Gotham
-    info.Text = "Rollback protection: saat rejoin, item yang baru diplant akan kembali ke inventory."
-    info.TextColor3 = Color3.fromRGB(180,180,180)
-    info.TextSize = 11
-    info.TextWrapped = true
-    info.Position = UDim2.new(0,10,0,50)
-    info.Size = UDim2.new(1,-20,0,60)
-    info.Parent = panel
-end
-
--- ============================================================
--- 14. BUILD UI
--- ============================================================
-local function buildUI()
-    local old = PlayerGui:FindFirstChild("HubGUI")
-    if old then old:Destroy() end
-
-    local screen = Instance.new("ScreenGui")
-    screen.Name = "HubGUI"
-    screen.IgnoreGuiInset = true
-    screen.Parent = PlayerGui
-
-    -- Toggle show/hide
-    local toggleScr = Instance.new("ScreenGui")
-    toggleScr.Name = "HubToggle"
-    toggleScr.IgnoreGuiInset = true
-    toggleScr.Parent = PlayerGui
-    local hideBtn = Instance.new("TextButton")
-    hideBtn.Size = UDim2.new(0,34,0,34)
-    hideBtn.Position = UDim2.new(1,-42,0,6)
-    hideBtn.BackgroundColor3 = Color3.fromRGB(70,120,180)
-    hideBtn.TextColor3 = Color3.fromRGB(245,245,245)
-    hideBtn.Font = Enum.Font.GothamBold
-    hideBtn.TextSize = 12
-    hideBtn.Text = "☼"
-    hideBtn.Parent = toggleScr
-    Instance.new("UICorner", hideBtn).CornerRadius = UDim.new(1,0)
-    local visible = true
-    hideBtn.Activated:Connect(function()
-        visible = not visible
-        mainFrame.Visible = visible
-        hideBtn.Text = visible and "☼" or "☾"
-        hideBtn.BackgroundColor3 = visible and Color3.fromRGB(70,120,180) or Color3.fromRGB(92,92,102)
-    end)
-
-    -- Main frame
-    local mainFrame = Instance.new("Frame")
-    mainFrame.Size = UDim2.new(0,500,0,520)
-    mainFrame.Position = UDim2.new(0.5,-250,0.08,0)
-    mainFrame.BackgroundColor3 = Color3.fromRGB(20,18,28)
-    mainFrame.BorderSizePixel = 0
-    mainFrame.Active = true
-    mainFrame.Draggable = true
-    mainFrame.Parent = screen
-
-    -- Title bar
-    local titleBar = Instance.new("Frame")
-    titleBar.BackgroundColor3 = Color3.fromRGB(40,30,48)
-    titleBar.BorderSizePixel = 0
-    titleBar.Size = UDim2.new(1,0,0,34)
-    titleBar.Parent = mainFrame
-
-    local titleLabel = Instance.new("TextLabel")
-    titleLabel.BackgroundTransparency = 1
-    titleLabel.Font = Enum.Font.GothamBold
-    titleLabel.Text = "🌱 " .. PlayerName .. "'s Hub"
-    titleLabel.TextColor3 = Color3.fromRGB(230,200,240)
-    titleLabel.TextSize = 14
-    titleLabel.TextXAlignment = Enum.TextXAlignment.Left
-    titleLabel.Position = UDim2.new(0,10,0,0)
-    titleLabel.Size = UDim2.new(1,-60,1,0)
-    titleLabel.Parent = titleBar
-
-    local minBtn = Instance.new("TextButton")
-    minBtn.BackgroundColor3 = Color3.fromRGB(60,40,50)
-    minBtn.BorderSizePixel = 0
-    minBtn.Font = Enum.Font.Gotham
-    minBtn.Text = "—"
-    minBtn.TextColor3 = Color3.fromRGB(200,180,190)
-    minBtn.TextSize = 16
-    minBtn.Position = UDim2.new(1,-42,0,0)
-    minBtn.Size = UDim2.new(0,28,1,0)
-    minBtn.AutoButtonColor = false
-    minBtn.Parent = titleBar
-
-    -- Sidebar
-    local sidebar = Instance.new("Frame")
-    sidebar.BackgroundColor3 = Color3.fromRGB(34,34,38)
-    sidebar.BorderSizePixel = 0
-    sidebar.Size = UDim2.new(0,90,1,-34)
-    sidebar.Position = UDim2.new(0,0,0,34)
-    sidebar.Parent = mainFrame
-    Instance.new("UICorner", sidebar).CornerRadius = UDim.new(0,6)
-
-    local tabLayout = Instance.new("UIListLayout")
-    tabLayout.Padding = UDim.new(0,4)
-    tabLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
-    tabLayout.VerticalAlignment = Enum.VerticalAlignment.Top
-    tabLayout.Parent = sidebar
-
-    -- Content
-    local content = Instance.new("Frame")
-    content.BackgroundTransparency = 1
-    content.Size = UDim2.new(1,-100,1,-40)
-    content.Position = UDim2.new(0,96,0,38)
-    content.Parent = mainFrame
-
-    local panels = {}
-    local tabBtns = {}
-
-    local function createTab(label, name, builder)
-        local btn = Instance.new("TextButton")
-        btn.Size = UDim2.new(1,-8,0,28)
-        btn.BackgroundColor3 = Color3.fromRGB(50,50,56)
-        btn.TextColor3 = Color3.fromRGB(240,240,240)
-        btn.Text = label
-        btn.Font = Enum.Font.GothamSemibold
-        btn.TextSize = 11
-        btn.AutoButtonColor = true
-        btn.Parent = sidebar
-        Instance.new("UICorner", btn).CornerRadius = UDim.new(0,6)
-
-        local panel = Instance.new("ScrollingFrame")
-        panel.BackgroundColor3 = Color3.fromRGB(38,38,38)
-        panel.BorderSizePixel = 0
-        panel.Size = UDim2.new(1,0,1,0)
-        panel.ScrollBarThickness = 4
-        panel.Visible = false
-        panel.Parent = content
-
-        local layout = Instance.new("UIListLayout")
-        layout.Padding = UDim.new(0,6)
-        layout.SortOrder = Enum.SortOrder.LayoutOrder
-        layout.Parent = panel
-
-        panels[name] = panel
-        tabBtns[name] = btn
-
-        btn.Activated:Connect(function()
-            for _, p in pairs(panels) do p.Visible = false end
-            for _, b in pairs(tabBtns) do b.BackgroundColor3 = Color3.fromRGB(50,50,56) end
-            panel.Visible = true
-            btn.BackgroundColor3 = Color3.fromRGB(88,136,186)
-            panel.CanvasSize = UDim2.new(0,0,0, layout.AbsoluteContentSize.Y + 20)
-        end)
-
-        if builder then builder(panel) end
-        return panel
-    end
-
-    createTab("📨 Gift", "Gift", buildGiftPanel)
-    createTab("🛒 Buy", "Buy", buildBuyPanel)
-    createTab("💰 Sell", "Sell", buildSellPanel)
-    createTab("🌱 Plant", "Plant", buildPlantPanel)
-    createTab("📦 Collect", "Collect", buildCollectPanel)
-    createTab("🔄 Rollback", "Rollback", buildRollbackPanel)
-
-    -- Aktifkan tab pertama
-    panels.Gift.Visible = true
-    tabBtns.Gift.BackgroundColor3 = Color3.fromRGB(88,136,186)
-
-    -- Drag & Minimize
-    local dragging = false
-    local dragStart, frameStart
-    titleBar.InputBegan:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-            dragging = true
-            dragStart = input.Position
-            frameStart = mainFrame.Position
-        end
-    end)
-    titleBar.InputEnded:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-            dragging = false
-        end
-    end)
-    UserInputService.InputChanged:Connect(function(input)
-        if dragging and input.Position then
-            local delta = input.Position - dragStart
-            local newX = frameStart.X.Offset + delta.X
-            local newY = frameStart.Y.Offset + delta.Y
-            local vp = workspace.CurrentCamera and workspace.CurrentCamera.ViewportSize or Vector2.new(800,600)
-            local maxX = math.max(0, vp.X - mainFrame.AbsoluteSize.X)
-            local maxY = math.max(0, vp.Y - mainFrame.AbsoluteSize.Y)
-            mainFrame.Position = UDim2.new(0, math.clamp(newX,0,maxX), 0, math.clamp(newY,0,maxY))
-        end
-    end)
-
-    local minimized = false
-    local origSize = mainFrame.Size
-    minBtn.Activated:Connect(function()
-        minimized = not minimized
-        if minimized then
-            TweenService:Create(mainFrame, TweenInfo.new(0.15), {
-                Size = UDim2.new(0, mainFrame.Size.X.Offset, 0, 34)
-            }):Play()
-            content.Visible = false
-            sidebar.Visible = false
-            minBtn.Text = "□"
-        else
-            content.Visible = true
-            sidebar.Visible = true
-            TweenService:Create(mainFrame, TweenInfo.new(0.15, Enum.EasingStyle.Back), {
-                Size = origSize
-            }):Play()
-            minBtn.Text = "—"
-        end
-    end)
-
-    -- Animate in
-    mainFrame.BackgroundTransparency = 1
-    TweenService:Create(mainFrame, TweenInfo.new(0.2), { BackgroundTransparency = 0 }):Play()
-    mainFrame.Position = UDim2.new(0.5, -250, 0.08, 50)
-    TweenService:Create(mainFrame, TweenInfo.new(0.3, Enum.EasingStyle.Back), {
-        Position = UDim2.new(0.5, -250, 0.08, 0)
-    }):Play()
-
-    screen.AncestryChanged:Connect(function()
-        if not screen:IsDescendantOf(game) then
-            -- Stop semua loop
-            state.giftAuto = false
-            state.buyAuto = false
-            state.sellAuto = false
-            state.plantAuto = false
-            state.collectAuto = false
-            state.rollbackAuto = false
-        end
-    end)
-
-    return screen
-end
-
--- ============================================================
--- 15. START
--- ============================================================
-local function init()
-    if PlayerGui:GetAttribute("HubInitialized") then return end
-    PlayerGui:SetAttribute("HubInitialized", true)
-    notify("🌱 Hub Loaded", "Welcome " .. PlayerName, 2)
-    delay(0.5, function() pcall(buildUI) end)
-end
-
-spawn(init)
-print("🌱 Grow A Garden 2 Ultimate Hub loaded!")
